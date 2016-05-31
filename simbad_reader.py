@@ -57,10 +57,15 @@ def read_simbad(simbad_output):
     return target_list
 
 def filter(target_list,decmin=None,decmax=None,ramin=None,\
-               ramax=None,magv=None):
+               ramax=None,magvmin=None,magvmax=None):
     """
     given a target list, go through and filter the list based on given limits
     if they are not the defaults provided. looking into adding more criteria
+
+    does order of filter matter here? also look into optimization. could we 
+    apply all criteria at once for each key, rather than looping multiple times
+    , mostlikely a better idea.
+
     """
     # a marker to see if we applied a filter
     new_list_flag = False
@@ -70,7 +75,8 @@ def filter(target_list,decmin=None,decmax=None,ramin=None,\
     # check for declination limits, will work this into setting up site 
     # most likely to be able to auto clip targets that will never rise
     # if so, throw a warning to user
-    if not (decmin and decmax):
+    if (decmin or decmax):
+        print 'Filtering for declination...'
         new_list_flag = True
         if decmin and decmax:
             for key in target_list:
@@ -88,9 +94,12 @@ def filter(target_list,decmin=None,decmax=None,ramin=None,\
                 if target_list[key]['coord1']['dec']<decmax:
                     new_list[key]=\
                         copy.deepcopy(target_list[key])
+        target_list = copy.deepcopy(new_list)
+        new_list = {}
 
     # check for RA limits, this is weird but why not include the option
-    if not (ramin and ramax):
+    if (ramin or ramax):
+        print 'Filtering for right assension...'
         new_list_flag = True
         if ramin and ramax:
             for key in target_list:
@@ -101,20 +110,42 @@ def filter(target_list,decmin=None,decmax=None,ramin=None,\
         elif ramin:
             for key in target_list:
                 if target_list[key]['coord1']['ra']>ramin:
-                    new_list[key]=\
-                        copy.deepcopy(target_list[key])
+                    new_list[key]=copy.deepcopy(target_list[key])
         elif ramax:
             for key in target_list:
                 if target_list[key]['coord1']['ra']<ramax:
+                    new_list[key]=copy.deepcopy(target_list[key])
+        target_list = copy.deepcopy(new_list)
+        new_list = {}
+
+    if (magvmin or  magvmax):
+        ipdb.set_trace()
+        print 'Filtering for magv...'
+        new_list_flag = True
+        if magvmin and magvmax:
+            for key in target_list:
+                if target_list[key]['magv']>magvmin and \
+                        target_list[key]['magv']<magvmax :
+                    new_list[key]=copy.deepcopy(target_list[key])
+        elif magvmin:
+            for key in target_list:
+                if target_list[key]['magv']>magvmin:
                     new_list[key]=\
                         copy.deepcopy(target_list[key])
-    return new_list
+        elif magvmax:
+            for key in target_list:
+                if target_list[key]['magv']<magvmax:
+                    new_list[key]=copy.deepcopy(target_list[key])
+        target_list = copy.deepcopy(new_list)
+        new_list = {}
+
+    return target_list
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     tlist = read_simbad('sample_list.txt')
     ipdb.set_trace()
-    newlist = filter(tlist,decmax=30.)
+    newlist = filter(tlist,decmin=-30,decmax=30.,ramin=50,ramax=180)
     ras = []
     decs = []
     for key in newlist.keys(): ras.append(newlist[key]['coord1']['ra'])
