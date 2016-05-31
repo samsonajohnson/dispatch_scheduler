@@ -21,37 +21,36 @@ def read_simbad(simbad_output):
     key_list = []
     for raw_key in lines[5].split('\t'):
         key = "".join(raw_key.split()).lower()
+        if key == 'typedident': key = 'name'
         # some cases where i don't like the simbad key
         if key == '#': key = 'number'
         # i think it will be up to the user to figure which coord is which
         # and this allows for multiple ones to be used
         if 'coord' in key: key = key.split('(')[0]
         key_list.append(key)
-    target_list = collections.OrderedDict()
+    target_list = []# collections.OrderedDict()
     for target in lines[7:-3]:
-        target_name = "".join(target.split('\t')[1].split())
-        target_list[target_name] = collections.OrderedDict()
+#        target_name = "".join(target.split('\t')[1].split())       
+        target_list.append(collections.OrderedDict())
         ind = 0
         for key in key_list:
             spltarg = target.split('\t')
 
             if 'coord' in key:
-                target_list[target_name][key] = collections.OrderedDict()
+#                target_list[-1][key] = collections.OrderedDict()
 #                ra = " ".join(spltarg[ind].split()[0:3]).split()
 #                ra = float(ra[0])*15.+float(ra[1])/60.+float(ra[2])/3600.
 #                dec = " ".join(spltarg[ind].split()[3:]).split()
 #                dec = float(dec[0])+float(dec[1])/60.+float(dec[2])/3600.
-                target_list[target_name][key]['ra']=\
-                    float(spltarg[ind].split()[0])
-                target_list[target_name][key]['dec']=\
-                    float(spltarg[ind].split()[1])
+                target_list[-1]['ra']=float(spltarg[ind].split()[0])
+                target_list[-1]['dec']=float(spltarg[ind].split()[1])
             else:
                 # attempt to convert to a float, but don't throw if not
                 try:
-                    target_list[target_name][key] = \
+                    target_list[-1][key] = \
                         float(target.split('\t')[ind])
                 except:
-                    target_list[target_name][key] = target.split('\t')[ind]
+                    target_list[-1][key] = target.split('\t')[ind]
             ind+=1
         
     return target_list
@@ -69,7 +68,7 @@ def filter(target_list,decmin=None,decmax=None,ramin=None,\
     """
     # a marker to see if we applied a filter
     new_list_flag = False
-    new_list = {}
+    new_list = []
 
 
     # check for declination limits, will work this into setting up site 
@@ -79,65 +78,56 @@ def filter(target_list,decmin=None,decmax=None,ramin=None,\
         print 'Filtering for declination...'
         new_list_flag = True
         if decmin and decmax:
-            for key in target_list:
-                if target_list[key]['coord1']['dec']>decmin and \
-                        target_list[key]['coord1']['dec']<decmax :
-                    new_list[key]=\
-                        copy.deepcopy(target_list[key])
+            for target in target_list:
+                if target['dec']>decmin and target['dec']<decmax:
+                    new_list.append(copy.deepcopy(target))
         elif decmin:
-            for key in target_list:
-                if target_list[key]['coord1']['dec']>decmin:
-                    new_list[key]=\
-                        copy.deepcopy(target_list[key])
+            for target in target_list:
+                if target['dec']>decmin:
+                    new_list.append(copy.deepcopy(target))
         elif decmax:
-            for key in target_list:
-                if target_list[key]['coord1']['dec']<decmax:
-                    new_list[key]=\
-                        copy.deepcopy(target_list[key])
+            for target in target_list:
+                if target['dec']<decmax:
+                    new_list.append(copy.deepcopy(target))
         target_list = copy.deepcopy(new_list)
-        new_list = {}
+        new_list = []
 
     # check for RA limits, this is weird but why not include the option
     if (ramin or ramax):
-        print 'Filtering for right assension...'
+        print 'Filtering for right ascension...'
         new_list_flag = True
         if ramin and ramax:
-            for key in target_list:
-                if target_list[key]['coord1']['ra']>ramin and \
-                        target_list[key]['coord1']['ra']<ramax :
-                    new_list[key]=\
-                        copy.deepcopy(target_list[key])
+            for target in target_list:
+                if target['ra']>ramin and target['ra']<ramax:
+                    new_list.append(copy.deepcopy(target))
         elif ramin:
-            for key in target_list:
-                if target_list[key]['coord1']['ra']>ramin:
-                    new_list[key]=copy.deepcopy(target_list[key])
+            for target in target_list:
+                if target['ra']>ramin:
+                    new_list.append(copy.deepcopy(target))
         elif ramax:
-            for key in target_list:
-                if target_list[key]['coord1']['ra']<ramax:
-                    new_list[key]=copy.deepcopy(target_list[key])
+            for target in target_list:
+                if target['ra']<ramax:
+                    new_list.append(copy.deepcopy(target))
         target_list = copy.deepcopy(new_list)
-        new_list = {}
+        new_list = []
 
-    if (magvmin or  magvmax):
-        ipdb.set_trace()
-        print 'Filtering for magv...'
+    if (magvmin or magvmax):
+        print 'Filtering for right ascension...'
         new_list_flag = True
         if magvmin and magvmax:
-            for key in target_list:
-                if target_list[key]['magv']>magvmin and \
-                        target_list[key]['magv']<magvmax :
-                    new_list[key]=copy.deepcopy(target_list[key])
+            for target in target_list:
+                if target['magv']>magvmin and target['magv']<magvmax:
+                    new_list.append(copy.deepcopy(target))
         elif magvmin:
-            for key in target_list:
-                if target_list[key]['magv']>magvmin:
-                    new_list[key]=\
-                        copy.deepcopy(target_list[key])
+            for target in target_list:
+                if target['magv']>magvmin:
+                    new_list.append(copy.deepcopy(target))
         elif magvmax:
-            for key in target_list:
-                if target_list[key]['magv']<magvmax:
-                    new_list[key]=copy.deepcopy(target_list[key])
+            for target in target_list:
+                if target['magv']<magvmax:
+                    new_list.append(copy.deepcopy(target))
         target_list = copy.deepcopy(new_list)
-        new_list = {}
+        new_list = []
 
     return target_list
 
@@ -145,11 +135,16 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     tlist = read_simbad('sample_list.txt')
     ipdb.set_trace()
-    newlist = filter(tlist,decmin=-30,decmax=30.,ramin=50,ramax=180)
+    newlist = filter(tlist,magvmin=6.,magvmax=9.)#decmin=-30,decmax=30.,ramin=50,ramax=180)
     ras = []
     decs = []
-    for key in newlist.keys(): ras.append(newlist[key]['coord1']['ra'])
-    for key in newlist.keys(): decs.append(newlist[key]['coord1']['dec'])
-    plt.plot(ras,decs,'.')
+    mags = []
+    for target in newlist: ras.append(target['ra'])
+    for target in newlist: decs.append(target['dec'])
+    for target in newlist: 
+        try: mags.append(float(target['magv']))
+        except: pass
+#    plt.plot(ras,decs,'.')
+    plt.plot(mags,'.')
     plt.show()
     ipdb.set_trace()
