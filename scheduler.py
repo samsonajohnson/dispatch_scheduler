@@ -4,27 +4,45 @@
 
 
 import numpy as np
-import targetlist
+import os
+import ephem
+#import targetlist
+import ephem
 import ipdb
-import env
+#import env
 import datetime
 import time
+from configobj import ConfigObj
 
 ###
 # SCHEDULER
 ###
 
 class scheduler:
-    def __init__(self,site,base_directory='/home/minerva/minerva-control'):
+    def __init__(self,config_file,base_directory='.'):
         #S want to get the site from the control class, makes easy computing
         #S LST and such
         self.base_directory = base_directory
-        self.site = site
-        #S this is to track whether we are currently taking a spectrum, which
-        #S we will need to know if we finish a photometry sequence and a 
-        #S telescope is freed up.
-        self.spec_in_progress = False
-        
+        self.config_file = config_file
+        # load the config file
+        self.load_config()
+        # make the observer which will be used in calculations and what not
+        self.obs = ephem.Observer()
+        self.obs.lat = ephem.degrees(str(self.latitude)) # N
+        self.obs.lon = ephem.degrees(str(self.longitude)) # E
+        self.obs.elevation = self.elevation # meters    
+
+    def load_config(self):
+        try:
+            config = ConfigObj(self.base_directory+'/config/'+self.config_file)
+            self.latitude = config['Setup']['LATITUDE']
+            self.longitude = config['Setup']['LONGITUDE']
+            self.elevation = float(config['Setup']['ELEVATION'])
+            self.logger_name = config['Setup']['LOGNAME']
+        except:
+            print('ERROR accessing configuration file: ' + self.config_file)
+            sys.exit()
+
     def calc_ha(self,target):
         self.site.obs.date = datetime.datetime.utcnow()
         lst = (self.site.obs.sidereal_time()*180./np.pi)/15.
@@ -190,11 +208,5 @@ class scheduler:
 
 if __name__ == '__main__':
     ipdb.set_trace()
-    test_site = env.site('site_mtHopkins.ini','/home/minerva/minerva-control')
-    target = {'ra':21.}
-    e = scheduler(test_site)
-    print e.calc_ha(target)
-    print test_site.obs.sidereal_time()
-    time.sleep(10)
-    print test_site.obs.sidereal_time()
+    e = scheduler('scheduler.ini')
     ipdb.set_trace()
