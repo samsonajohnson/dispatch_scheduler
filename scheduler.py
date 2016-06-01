@@ -35,8 +35,8 @@ class scheduler:
         self.obs.date = self.time
         # an ephem sun and moon object for tracking the sun
         self.sun = ephem.Sun()
-        self.sun.compute()
-        self.moon = ephem.Moon(self.obs)
+        self.sun.compute(self.obs)
+        self.moon = ephem.Moon()
         self.moon.compute(self.obs)
         
 
