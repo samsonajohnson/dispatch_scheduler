@@ -46,7 +46,10 @@ class scheduler:
             self.latitude = config['Setup']['LATITUDE']
             self.longitude = config['Setup']['LONGITUDE']
             self.elevation = float(config['Setup']['ELEVATION'])
-            self.logger_name = config['Setup']['LOGNAME']
+            self.sitename = config['Setup']['SITENAME']
+            # used for minerva logging
+#            self.logger_name = config['Setup']['LOGNAME']
+
         except:
             print('ERROR accessing configuration file: ' + self.config_file)
             sys.exit()
