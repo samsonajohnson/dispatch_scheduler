@@ -10,7 +10,9 @@ import datetime
 
 
 class telescope:
-    def __init__(self):
+    def __init__(self,config_file,base_directory='.'):
+        self.base_directory = base_directory
+        self.config_file = config_file
         self.load_config()
 
     def load_config(self):
@@ -28,7 +30,9 @@ class telescope:
         """
         slew to a given target, give some overhead for actually acquiring?
         """
+        pass
 
     def slew(self,target_alt,target_azm,time):
+        pass
         
         

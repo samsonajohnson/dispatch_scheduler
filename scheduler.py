@@ -31,6 +31,14 @@ class scheduler:
         self.obs.lat = ephem.degrees(str(self.latitude)) # N
         self.obs.lon = ephem.degrees(str(self.longitude)) # E
         self.obs.elevation = self.elevation # meters    
+        self.time = datetime.datetime(2000,1,1,12,00,00)
+        self.obs.date = self.time
+        # an ephem sun and moon object for tracking the sun
+        self.sun = ephem.Sun()
+        self.sun.compute()
+        self.moon = ephem.Moon(self.obs)
+        self.moon.compute(self.obs)
+        
 
     def load_config(self):
         try:
