@@ -5,15 +5,18 @@ of where it is pointing, etc. Could also implement two observing mode feature.
 
 from configobj import ConfigObj
 import utils
+import sys
+import os
 import ephem
 import datetime
 
 
 class telescope:
-    def __init__(self,config_file,base_directory='.'):
+    def __init__(self,config_file,number,base_directory='.'):
         self.base_directory = base_directory
         self.config_file = config_file
         self.load_config()
+        self.number = number
 
     def load_config(self):
         try:
@@ -34,5 +37,9 @@ class telescope:
 
     def slew(self,target_alt,target_azm,time):
         pass
+
+    def observe(self,target,scheduler):
+        obs_string = 'T1'
+        return obs_string
         
         

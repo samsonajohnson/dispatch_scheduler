@@ -33,24 +33,36 @@ def read_simbad(simbad_output):
 #        target_name = "".join(target.split('\t')[1].split())       
         target_list.append(collections.OrderedDict())
         ind = 0
+        spltarg = target.split('\t')
+        while '' in spltarg: spltarg.remove('')
+#        ipdb.set_trace()
         for key in key_list:
-            spltarg = target.split('\t')
-
             if 'coord' in key:
+                if len(spltarg[ind].split())>2:
 #                target_list[-1][key] = collections.OrderedDict()
-#                ra = " ".join(spltarg[ind].split()[0:3]).split()
-#                ra = float(ra[0])*15.+float(ra[1])/60.+float(ra[2])/3600.
-#                dec = " ".join(spltarg[ind].split()[3:]).split()
-#                dec = float(dec[0])+float(dec[1])/60.+float(dec[2])/3600.
-                target_list[-1]['ra']=float(spltarg[ind].split()[0])
-                target_list[-1]['dec']=float(spltarg[ind].split()[1])
+                    ra = " ".join(spltarg[ind].split()[0:3]).split()
+                    ra = (float(ra[0])+float(ra[1])/60.+float(ra[2])/3600.)*15.
+                    dec = " ".join(spltarg[ind].split()[3:]).split()
+                    if float(dec[0])<0:
+                        dec=float(dec[0])-float(dec[1])/60.-float(dec[2])/3600.
+                    else:
+                        dec=float(dec[0])+float(dec[1])/60.+float(dec[2])/3600.
+                    target_list[-1]['ra']=ra
+                    target_list[-1]['dec']=dec
+
+                else:
+                    target_list[-1]['ra']=float(spltarg[ind].split()[0])
+                    target_list[-1]['dec']=float(spltarg[ind].split()[1])
+            elif 'pm' in key:
+                target_list[-1]['pmra']=float(spltarg[ind].split()[0])
+                target_list[-1]['pmdec']=float(spltarg[ind].split()[1])
             else:
                 # attempt to convert to a float, but don't throw if not
                 try:
                     target_list[-1][key] = \
-                        float(target.split('\t')[ind])
+                        float(spltarg[ind])
                 except:
-                    target_list[-1][key] = target.split('\t')[ind]
+                    target_list[-1][key] = spltarg[ind].strip()
             ind+=1
         
     return target_list
@@ -112,7 +124,7 @@ def filter(target_list,decmin=None,decmax=None,ramin=None,\
         new_list = []
 
     if (magvmin or magvmax):
-        print 'Filtering for right ascension...'
+        print 'Filtering for magv...'
         new_list_flag = True
         if magvmin and magvmax:
             for target in target_list:
@@ -133,9 +145,11 @@ def filter(target_list,decmin=None,decmax=None,ramin=None,\
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    tlist = read_simbad('sample_list.txt')
     ipdb.set_trace()
-    newlist = filter(tlist,magvmin=6.,magvmax=9.)#decmin=-30,decmax=30.,ramin=50,ramax=180)
+#    tlist = read_simbad('sample_list.txt')
+    tlist = read_simbad('secret/eta_list.txt')#sample_list.txt')
+    ipdb.set_trace()
+    newlist = filter(tlist)
     ras = []
     decs = []
     mags = []
@@ -144,7 +158,7 @@ if __name__ == '__main__':
     for target in newlist: 
         try: mags.append(float(target['magv']))
         except: pass
-#    plt.plot(ras,decs,'.')
-    plt.plot(mags,'.')
+    plt.plot(ras,decs,'.')
+#    plt.plot(mags,'.')
     plt.show()
     ipdb.set_trace()

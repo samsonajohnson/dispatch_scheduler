@@ -6,6 +6,7 @@
 import numpy as np
 import os
 import ephem
+import sys
 #import targetlist
 import ephem
 import ipdb
