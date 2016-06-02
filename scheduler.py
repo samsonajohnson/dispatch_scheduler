@@ -201,6 +201,23 @@ class scheduler:
         return True
         pass
 
+    def sunrise(self, currenttime, horizon=0):
+        sunrise = self.obs.next_rising(ephem.Sun(), start=currenttime,\
+                                           use_center=True).datetime()
+        return sunrise
+    def sunset(self, current, horizon=0):
+        sunset = self.obs.next_setting(ephem.Sun(), start=currenttime,\
+                                           use_center=True).datetime()
+        return sunset
+    def sunalt(self):
+        sun = ephem.Sun()
+        sun.compute(self.obs)
+        return float(sun.alt)*180.0/math.pi
+    def sunaz(self):
+        sun = ephem.Sun()
+        sun.compute(self.obs)
+        return float(sun.az)*180.0/math.pi
+
     def dict_to_class(self):
         #S a potential route we can take.
         pass
