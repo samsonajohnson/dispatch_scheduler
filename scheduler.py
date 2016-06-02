@@ -4,6 +4,7 @@
 
 
 import numpy as np
+import math
 import os
 import ephem
 import sys
@@ -201,12 +202,21 @@ class scheduler:
         return True
         pass
 
-    def sunrise(self, currenttime, horizon=0):
+    def nextsunrise(self, currenttime, horizon=0):
         sunrise = self.obs.next_rising(ephem.Sun(), start=currenttime,\
                                            use_center=True).datetime()
         return sunrise
-    def sunset(self, current, horizon=0):
+    def nextsunset(self, currenttime, horizon=0):
         sunset = self.obs.next_setting(ephem.Sun(), start=currenttime,\
+                                           use_center=True).datetime()
+        return sunset
+
+    def prevsunrise(self, currenttime, horizon=0):
+        sunrise = self.obs.previous_rising(ephem.Sun(), start=currenttime,\
+                                           use_center=True).datetime()
+        return sunrise
+    def prevsunset(self, currenttime, horizon=0):
+        sunset = self.obs.previous_setting(ephem.Sun(), start=currenttime,\
                                            use_center=True).datetime()
         return sunset
     def sunalt(self):
