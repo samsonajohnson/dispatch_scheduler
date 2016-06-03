@@ -51,6 +51,7 @@ class simulation:
         """
         self.time = time
         self.scheduler.time = time
+        self.scheduler.obs.date=time
         
             
                                    
@@ -121,13 +122,18 @@ if __name__ == '__main__':
     import ipdb
 
     ipdb.set_trace()
-    sc = scheduler.scheduler('scheduler.ini')
-
     # start off by making a simulation class
     sim = simulation('simulation.ini')
-    targetlist=simbad_reader.read_simbad('./secret/eta_list.txt')
-    for target in targetlist:
-        sim.write_target_file(target)
+#    targetlist=simbad_reader.read_simbad('./secret/eta_list.txt')
+#    for target in targetlist:
+#        sim.write_target_file(target)
+    sim.update_time(datetime.datetime.utcnow())
+    sim.scheduler.calculate_weights()
+    weights = []
+    magvs = []
+    for target in sim.scheduler.target_list:
+        magvs.append(target['magv'])
+        weights.append(target['weight'])
     i=1
     ipdb.set_trace()
     # while we are still in the simulation time frame
@@ -150,6 +156,11 @@ if __name__ == '__main__':
                 sim.scheduler.prevsunrise(sim.time)<\
                 sim.scheduler.prevsunset(sim.time):
             print 'it is nightime'
+            # determine target
+            #    -find observable targets (might want to do this for all 
+            #     possible targets at beginning of night to shorten load
+            # observe target, update clocks
+            # record observation
             sim.time+=datetime.timedelta(minutes=10)
             continue
 
