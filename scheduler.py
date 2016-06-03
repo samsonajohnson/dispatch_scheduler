@@ -141,7 +141,7 @@ class scheduler:
             if self.is_observable(target):
                 target['weight'] = self.calc_weight(target)
             else:
-                target['weight'] = -999
+                target['weight'] = -1
         self.target_list = sorted(self.target_list, key=lambda x:x['weight'])
         #pass
 
@@ -191,7 +191,29 @@ class scheduler:
                                      -30.)/30.
             
             
-            
+    def prep_night(self,timeof=None):
+        """
+        A function to go through some processes that only need to be done at 
+        the beginning of the night.
+        """
+        if timeof == None:
+            timeof = self.time
+        # temp set the horizon for targets
+        self.obs.date = self.time
+        self.obs.horizon = str(self.target_horizon)
+
+        for target in self.target_list:
+            # reset targets observation counter for the night to zero
+            target['observed']=0
+            # compute the target for the obs at time and horizon
+            target['fixedbody'].compute(self.obs)
+            target['fixedbody'].compute(self.obs)
+            # if it's neverup, flag it
+            if target['fixedbody'].neverup:
+                target['neverup']=True
+            else:
+                target['neverup']=False
+                
         
 
     def is_observable(self,target,timeof=None):
@@ -226,7 +248,7 @@ class scheduler:
         #TODO:
         # i think this checks for just a 24 hour period, but needs more 
         # invetigation
-        if target['fixedbody'].neverup:
+        if target['neverup']:
             #print(target['name']+" is never up")
             return False
         

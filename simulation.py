@@ -131,13 +131,14 @@ class simulation:
 if __name__ == '__main__':
     import ipdb
 
-    ipdb.set_trace()
+#    ipdb.set_trace()
     # start off by making a simulation class
     sim = simulation('simulation.ini')
 #    targetlist=simbad_reader.read_simbad('./secret/eta_list.txt')
 #    for target in targetlist:
 #        sim.write_target_file(target)
 #    sim.update_time(datetime.datetime.utcnow())
+    sim.scheduler.prep_night()
     sim.scheduler.calculate_weights()
     weights = []
     magvs = []
@@ -153,19 +154,15 @@ if __name__ == '__main__':
         sim.update_time(sim.time)
         # if the current time is before the next sunset and the previous
         # sunrise is greater than the previous sunset, it is daytime
-
         if sim.time < sim.scheduler.nextsunset(sim.time) and\
                 sim.scheduler.prevsunset(sim.time)<\
                 sim.scheduler.prevsunrise(sim.time):
-            setimes.append(sim.time)
+
             # change the current time to the time of sunset and add one second
             sim.time = sim.scheduler.nextsunset(sim.time)+\
                 datetime.timedelta(seconds=1)
-            for target in sim.scheduler.target_list:
-                target['observed']=0
-
-            print 'it is daytime'
-            setimes.append(sim.time)
+            sim.update_time(sim.time)
+            sim.scheduler.prep_night()
 
             sim.time+=datetime.timedelta(minutes=10)
             # end iteration
@@ -176,9 +173,7 @@ if __name__ == '__main__':
         if sim.time < sim.scheduler.nextsunrise(sim.time) and \
                 sim.scheduler.prevsunrise(sim.time)<\
                 sim.scheduler.prevsunset(sim.time):
-            print sim.time
-            print sim.scheduler.time
-            print sim.scheduler.obs.date.datetime()
+
             for target in sim.scheduler.target_list:
                 if sim.scheduler.is_observable(target) and \
                         target['observed']==0:
@@ -190,12 +185,6 @@ if __name__ == '__main__':
                     sim.scheduler.is_observable(target)
                     sim.time+=datetime.timedelta(minutes=target['exptime'])
                     break
-            print 'it is nightime'
-            # determine target
-            #    -find observable targets (might want to do this for all 
-            #     possible targets at beginning of night to shorten load
-            # observe target, update clocks
-            # record observation
             sim.time+=datetime.timedelta(minutes=5)
     print obs_count
     ipdb.set_trace()
