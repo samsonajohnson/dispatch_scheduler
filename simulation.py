@@ -4,6 +4,7 @@ The main framework for the dispatch scheduler simulation.
 import scheduler
 import telescope
 import datetime
+import math
 import sys
 import os
 import glob
@@ -95,22 +96,31 @@ class simulation:
         header = 'obs_start \t obs_end \t duration \t altitude \t azimuth'
         with open(self.sim_path+target['name']+'.txt','w') as target_file:
             target_file.write(header+'\n\n')
-    def calc_exptine(self,target):
-        1./60. + exp_time*pow(10,(kappa/cos(M_PI/2-alt*M_PI/180)))/60.;
-    def record_observation(self,target,telescopes):
+    def calc_exptime(self,target):
+        return target['exptime']
+
+    def record_observation(self,target,telescopes=None):
         obs_start = self.time
-        exptime = self.calc_exptime(target['exptime'])
-        obs_end = self.time + exptime
+        exptime = self.calc_exptime(target)
+        obs_end = self.time + datetime.timedelta(minutes=exptime)
         duration = (obs_end-obs_start).total_seconds()
         try: os.stat(self.sim_path+target['name']+'.txt')
         except: self.write_target_file(target)
-        target_alt_az = self.scheduler.radectoaltaz(target)
+        self.scheduler.obs.date=self.time
+        target['fixedbody'].compute(self.scheduler.obs)
+        alt = target['fixedbody'].alt
+        azm = target['fixedbody'].az
+#        if target['fixedbody'].alt < 0:
+#            ipdb.set_trace()
         with open(self.sim_path+target['name']+'.txt','a') as target_file:
             obs_string = obs_start.strftime(self.dt_fmt)+'\t'+\
                 obs_end.strftime(self.dt_fmt)+'\t'+\
-                str(duration)+'\t'+\
-                str(self.scheduler.radectoaltaz(target))+\
-                '\n'            
+                '%.2f'%duration+'\t'+\
+                '%.3f'%math.degrees(alt)+'\t'+\
+                '%.3f'%math.degrees(azm)+'\t'+\
+                '\n'         
+            print(target['name']+': '+obs_string)
+            target_file.write(obs_string)
         pass
                                    
                       
@@ -127,7 +137,7 @@ if __name__ == '__main__':
 #    targetlist=simbad_reader.read_simbad('./secret/eta_list.txt')
 #    for target in targetlist:
 #        sim.write_target_file(target)
-    sim.update_time(datetime.datetime.utcnow())
+#    sim.update_time(datetime.datetime.utcnow())
     sim.scheduler.calculate_weights()
     weights = []
     magvs = []
@@ -135,35 +145,60 @@ if __name__ == '__main__':
         magvs.append(target['magv'])
         weights.append(target['weight'])
     i=1
-    ipdb.set_trace()
+    obs_count=0
+    total_exp = 0
+    setimes = []
     # while we are still in the simulation time frame
     while sim.time < sim.endtime:
+        sim.update_time(sim.time)
         # if the current time is before the next sunset and the previous
         # sunrise is greater than the previous sunset, it is daytime
+
         if sim.time < sim.scheduler.nextsunset(sim.time) and\
                 sim.scheduler.prevsunset(sim.time)<\
                 sim.scheduler.prevsunrise(sim.time):
+            setimes.append(sim.time)
             # change the current time to the time of sunset and add one second
             sim.time = sim.scheduler.nextsunset(sim.time)+\
                 datetime.timedelta(seconds=1)
+            for target in sim.scheduler.target_list:
+                target['observed']=0
+
             print 'it is daytime'
+            setimes.append(sim.time)
+
             sim.time+=datetime.timedelta(minutes=10)
             # end iteration
             continue
         # if the current time is before the next sunrise and the previous
         # sunset is greater than the previous sunrise, it is nighttime
+        
         if sim.time < sim.scheduler.nextsunrise(sim.time) and \
                 sim.scheduler.prevsunrise(sim.time)<\
                 sim.scheduler.prevsunset(sim.time):
+            print sim.time
+            print sim.scheduler.time
+            print sim.scheduler.obs.date.datetime()
+            for target in sim.scheduler.target_list:
+                if sim.scheduler.is_observable(target) and \
+                        target['observed']==0:
+                    total_exp += sim.calc_exptime(target)
+                    target['observed']=1
+                    sim.record_observation(target)
+                    obs_count+=1
+#                    ipdb.set_trace()
+                    sim.scheduler.is_observable(target)
+                    sim.time+=datetime.timedelta(minutes=target['exptime'])
+                    break
             print 'it is nightime'
             # determine target
             #    -find observable targets (might want to do this for all 
             #     possible targets at beginning of night to shorten load
             # observe target, update clocks
             # record observation
-            sim.time+=datetime.timedelta(minutes=10)
-            continue
-
+            sim.time+=datetime.timedelta(minutes=5)
+    print obs_count
+    ipdb.set_trace()
         
     pass
     # plan

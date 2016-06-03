@@ -138,11 +138,9 @@ class scheduler:
         #S need to update weights for all the targets in the list.
         #S going to use simple HA weighting for now.
         for target in self.target_list:
-            print(self.is_observable(target))
             if self.is_observable(target):
                 target['weight'] = self.calc_weight(target)
             else:
-                print('here')
                 target['weight'] = -999
         self.target_list = sorted(self.target_list, key=lambda x:x['weight'])
         #pass
@@ -229,25 +227,31 @@ class scheduler:
         # i think this checks for just a 24 hour period, but needs more 
         # invetigation
         if target['fixedbody'].neverup:
-            print(target['name']+" is never up")
+            #print(target['name']+" is never up")
             return False
         
         # next is some nested if-statements for checking observability
+        # still need to check if target will set before end of obs
 
         # check if the star is already in the sky
         if target['fixedbody'].alt > math.radians(float(self.target_horizon)):
+#            ipdb.set_trace()
+            if target['fixedbody'].alt < 0:
+                ipdb.set_trace()
             # see if we have enough time to observe
-            print(target['name']+" is above horizon")
+            #print(target['name']+" is above horizon")
             if timeof+datetime.timedelta(minutes=target['exptime'])<\
                     self.nextsunrise(timeof,horizon=self.sun_horizon):
                 # there is time to observe
-                print('Can currently observe '+target['name'])
+                #print('Can currently observe '+target['name'])
                 return True
             else:
                 # there is not enought time to observe this target before the 
                 # sun rises
-                print("can't observe"+target['name'])
+                #print("can't observe"+target['name'])
                 return False
+        else:
+            return False
         
         # check to see if we are far enough from the moon
         #TODO need to test this, just a pass for now
@@ -274,7 +278,6 @@ class scheduler:
         pass
 
     def nextsunrise(self, currenttime, horizon=0):
-        # .compute(self.obs), \
         sunrise = self.obs.next_rising(ephem.Sun(),start=currenttime,\
                                            use_center=True).datetime()
         return sunrise
