@@ -32,6 +32,7 @@ class scheduler:
         self.obs = ephem.Observer()
         self.obs.lat = ephem.degrees(str(self.latitude)) # N
         self.obs.lon = ephem.degrees(str(self.longitude)) # E
+        self.obs.horizon = ephem.degrees(str(self.horizon))
         self.obs.elevation = self.elevation # meters    
         self.time = datetime.datetime(2000,1,1,12,00,00)
         self.obs.date = self.time
@@ -49,6 +50,8 @@ class scheduler:
             self.longitude = config['Setup']['LONGITUDE']
             self.elevation = float(config['Setup']['ELEVATION'])
             self.sitename = config['Setup']['SITENAME']
+            self.horizon = float(config['Setup']['HORIZON'])
+            self.minalt = float(config['Setup']['MINALT'])
             # used for minerva logging
 #            self.logger_name = config['Setup']['LOGNAME']
 
@@ -174,7 +177,7 @@ class scheduler:
             
         
 
-    def can_observe(self,target):
+    def can_observe(self,target,timeof=None):
         #S want to make sure taget is a legal candidate. this includes avoiding
         #S targets who:
         #S   - have not risen
@@ -189,6 +192,16 @@ class scheduler:
 #        if target['observed'] == 1:
 #            continue
         #S Check to see if we will try and observe past sunset
+        
+        #TODO need coordinate propigation before this point, does pyephem do 
+        #TODO this?
+        tempstar = ephem.FixedBody()
+        tempstar._ra = target['ra']
+        tempstar._dec = target['dec']
+        tempstar._epoch = 2000.0
+        
+        tempstar.compute(self.obs)
+
         if (datetime.datetime.utcnow()+\
                 datetime.timedelta(seconds=target['exptime']))\
                 >self.site.NautTwilEnd():
@@ -203,7 +216,8 @@ class scheduler:
         pass
 
     def nextsunrise(self, currenttime, horizon=0):
-        sunrise = self.obs.next_rising(ephem.Sun(), start=currenttime,\
+        # .compute(self.obs), \
+        sunrise = self.obs.next_rising(ephem.Sun(),start=currenttime,\
                                            use_center=True).datetime()
         return sunrise
     def nextsunset(self, currenttime, horizon=0):
@@ -219,7 +233,11 @@ class scheduler:
         sunset = self.obs.previous_setting(ephem.Sun(), start=currenttime,\
                                            use_center=True).datetime()
         return sunset
-    def sunalt(self):
+    def sunalt(self,timeof=None):
+        if timeof == None:
+            self.obs.date=datetime.datetime.utcnow()
+        else:
+            self.obs.date=timeof
         sun = ephem.Sun()
         sun.compute(self.obs)
         return float(sun.alt)*180.0/math.pi

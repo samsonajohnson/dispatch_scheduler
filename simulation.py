@@ -18,7 +18,7 @@ class simulation:
         self.load_config()
         self.create_class_objects(tel_num=1)
         self.init_infofile(self.scheduler)
-        self.current_time = self.starttime
+        self.update_time(self.starttime)
 
     def load_config(self):
         
@@ -43,6 +43,16 @@ class simulation:
         self.telescopes = []
         for ind in range(tel_num):
             self.telescopes.append(telescope.telescope('telescope.ini',ind+1))
+        
+    def update_time(self,time):
+        """
+        A dinky function that can be used to update the time for all class 
+        objects to make sure everything is in sync
+        """
+        self.time = time
+        self.scheduler.time = time
+        
+            
                                    
     def init_infofile(self,sheduler):
         """
@@ -87,9 +97,9 @@ class simulation:
     def calc_exptine(self,target):
         1./60. + exp_time*pow(10,(kappa/cos(M_PI/2-alt*M_PI/180)))/60.;
     def record_observation(self,target,telescopes):
-        obs_start = self.current_time
+        obs_start = self.time
         exptime = self.calc_exptime(target['exptime'])
-        obs_end = self.current_time + exptime
+        obs_end = self.time + exptime
         duration = (obs_end-obs_start).total_seconds()
         try: os.stat(self.sim_path+target['name']+'.txt')
         except: self.write_target_file(target)
@@ -99,11 +109,7 @@ class simulation:
                 obs_end.strftime(self.dt_fmt)+'\t'+\
                 str(duration)+'\t'+\
                 str(self.scheduler.radectoaltaz(target))+\
-                '\n'
-            
-        
-            
-            
+                '\n'            
         pass
                                    
                       
@@ -125,26 +131,26 @@ if __name__ == '__main__':
     i=1
     ipdb.set_trace()
     # while we are still in the simulation time frame
-    while sim.current_time < sim.endtime:
+    while sim.time < sim.endtime:
         # if the current time is before the next sunset and the previous
         # sunrise is greater than the previous sunset, it is daytime
-        if sim.current_time < sim.scheduler.nextsunset(sim.current_time) and\
-                sim.scheduler.prevsunset(sim.current_time)<\
-                sim.scheduler.prevsunrise(sim.current_time):
+        if sim.time < sim.scheduler.nextsunset(sim.time) and\
+                sim.scheduler.prevsunset(sim.time)<\
+                sim.scheduler.prevsunrise(sim.time):
             # change the current time to the time of sunset and add one second
-            sim.current_time = sim.scheduler.nextsunset(sim.current_time)+\
+            sim.time = sim.scheduler.nextsunset(sim.time)+\
                 datetime.timedelta(seconds=1)
             print 'it is daytime'
-            sim.current_time+=datetime.timedelta(minutes=10)
+            sim.time+=datetime.timedelta(minutes=10)
             # end iteration
             continue
         # if the current time is before the next sunrise and the previous
         # sunset is greater than the previous sunrise, it is nighttime
-        if sim.current_time < sim.scheduler.nextsunrise(sim.current_time) and \
-                sim.scheduler.prevsunrise(sim.current_time)<\
-                sim.scheduler.prevsunset(sim.current_time):
+        if sim.time < sim.scheduler.nextsunrise(sim.time) and \
+                sim.scheduler.prevsunrise(sim.time)<\
+                sim.scheduler.prevsunset(sim.time):
             print 'it is nightime'
-            sim.current_time+=datetime.timedelta(minutes=10)
+            sim.time+=datetime.timedelta(minutes=10)
             continue
 
         
