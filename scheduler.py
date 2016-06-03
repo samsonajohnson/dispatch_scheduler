@@ -8,6 +8,7 @@ import math
 import os
 import ephem
 import sys
+import simbad_reader
 #import targetlist
 import ephem
 import ipdb
@@ -32,7 +33,7 @@ class scheduler:
         self.obs = ephem.Observer()
         self.obs.lat = ephem.degrees(str(self.latitude)) # N
         self.obs.lon = ephem.degrees(str(self.longitude)) # E
-        self.obs.horizon = ephem.degrees(str(self.horizon))
+        self.obs.horizon = ephem.degrees(str(self.sun_horizon))
         self.obs.elevation = self.elevation # meters    
         self.time = datetime.datetime(2000,1,1,12,00,00)
         self.obs.date = self.time
@@ -42,6 +43,9 @@ class scheduler:
         self.moon = ephem.Moon()
         self.moon.compute(self.obs)
         
+        # if you are using the simbad reader target list
+        self.target_list = simbad_reader.read_simbad(self.targets_file)
+        self.make_fixedBodies()
 
     def load_config(self):
         try:
@@ -50,8 +54,10 @@ class scheduler:
             self.longitude = config['Setup']['LONGITUDE']
             self.elevation = float(config['Setup']['ELEVATION'])
             self.sitename = config['Setup']['SITENAME']
-            self.horizon = float(config['Setup']['HORIZON'])
-            self.minalt = float(config['Setup']['MINALT'])
+            self.sun_horizon = float(config['Setup']['HORIZON'])
+            self.target_horizon = float(config['Setup']['MINALT'])
+            self.targets_file = config['Setup']['TARGETSFILE']
+            self.min_moon_sep = float(config['Setup']['MINMOONSEP'])
             # used for minerva logging
 #            self.logger_name = config['Setup']['LOGNAME']
 
@@ -132,16 +138,29 @@ class scheduler:
         #S need to update weights for all the targets in the list.
         #S going to use simple HA weighting for now.
         for target in self.target_list:
-#            if self.can_observe(target):
-            target['weight'] = self.calc_weight(target)
-#            else:
-#                target['weight'] = -1
-        pass
+            print(self.is_observable(target))
+            if self.is_observable(target):
+                target['weight'] = self.calc_weight(target)
+            else:
+                print('here')
+                target['weight'] = -999
+        self.target_list = sorted(self.target_list, key=lambda x:x['weight'])
+        #pass
 
 
     def calc_weight(self,target):
+        target['fixedbody'].compute(self.obs)
+        target['fixedbody'].alt
+        return target['magv']
+
+    def make_fixedBodies(self):
         for target in self.target_list:
-            target['weight'] = target['vmag']
+            target['fixedbody'] = ephem.FixedBody()
+            target['fixedbody']._ra = target['ra']
+            target['fixedbody']._dec = target['dec']
+            target['fixedbody']._epoch = 2000.0
+            target['fixedbody'].compute(self.obs)
+
         
     def calc_weight1(self,target):
         #S if the target was observed less than the separation time limit
@@ -177,7 +196,11 @@ class scheduler:
             
         
 
-    def can_observe(self,target,timeof=None):
+    def is_observable(self,target,timeof=None):
+        # if the timeof obs is not provided, use the schedulers clock for the 
+        # time. this could cause issues, need to keep an eye on it
+        if timeof == None:
+            timeof=self.time
         #S want to make sure taget is a legal candidate. this includes avoiding
         #S targets who:
         #S   - have not risen
@@ -195,17 +218,52 @@ class scheduler:
         
         #TODO need coordinate propigation before this point, does pyephem do 
         #TODO this?
-        tempstar = ephem.FixedBody()
-        tempstar._ra = target['ra']
-        tempstar._dec = target['dec']
-        tempstar._epoch = 2000.0
+        # temporarily set the self.obs horizon to the minalt, will be 
+        # switched back after check
+        self.obs.date = timeof
+        self.obs.horizon = str(self.target_horizon)
+        target['fixedbody'].compute(self.obs)
         
-        tempstar.compute(self.obs)
+        # check if the star will be rising sometime tonight
+        #TODO:
+        # i think this checks for just a 24 hour period, but needs more 
+        # invetigation
+        if target['fixedbody'].neverup:
+            print(target['name']+" is never up")
+            return False
+        
+        # next is some nested if-statements for checking observability
 
-        if (datetime.datetime.utcnow()+\
-                datetime.timedelta(seconds=target['exptime']))\
-                >self.site.NautTwilEnd():
-            pass
+        # check if the star is already in the sky
+        if target['fixedbody'].alt > math.radians(float(self.target_horizon)):
+            # see if we have enough time to observe
+            print(target['name']+" is above horizon")
+            if timeof+datetime.timedelta(minutes=target['exptime'])<\
+                    self.nextsunrise(timeof,horizon=self.sun_horizon):
+                # there is time to observe
+                print('Can currently observe '+target['name'])
+                return True
+            else:
+                # there is not enought time to observe this target before the 
+                # sun rises
+                print("can't observe"+target['name'])
+                return False
+        
+        # check to see if we are far enough from the moon
+        #TODO need to test this, just a pass for now
+        moon = ephem.Moon()
+        moon.compute(self.obs)
+        if ephem.separation(moon,target['fixedbody'])<self.min_moon_sep:
+            pass# return False
+        
+        # reset the horizon for the sun
+        self.obs.horizon = str(self.sun_horizon)
+        
+        
+#        if (datetime.datetime.utcnow()+\
+#                datetime.timedelta(seconds=target['exptime']))\
+#                >self.site.NautTwilEnd():
+#            pass
 #            continue
         #S check to see if the target will go below horizon before 
         #S finishing the observation.
