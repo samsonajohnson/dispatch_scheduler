@@ -123,7 +123,23 @@ class simulation:
             print(target['name']+': '+obs_string)
             target_file.write(obs_string)
         pass
-                                   
+
+    def record_target(self,target):
+        self.scheduler.obs.horizon=str(self.scheduler.target_horizon)
+        target['fixedbody'].compute(self.scheduler.obs)
+        if  target['fixedbody'].neverup:
+            return
+        if  target['fixedbody'].circumpolar:
+            return
+        with open(self.sim_path+target['name']+'set.txt','a') as targetfile:
+            tstime = self.scheduler.obs.next_setting(\
+                target['fixedbody'],start=self.time).datetime()
+            targetfile.write(tstime.strftime(self.dt_fmt+'\n'))
+        with open(self.sim_path+target['name']+'rise.txt','a') as targetfile:
+            trtime = self.scheduler.obs.next_rising(\
+                target['fixedbody'],start=self.time).datetime()
+            targetfile.write(trtime.strftime(self.dt_fmt+'\n'))
+
                       
     def record_sun(self):
         with open(self.sim_path+'sunset.txt','a') as sunfile:
@@ -173,6 +189,8 @@ if __name__ == '__main__':
                 sim.scheduler.prevsunrise(sim.time):
             # record the next sunrise and set times
             sim.record_sun()
+            for target in sim.scheduler.target_list:
+                sim.record_target(target)
             # change the current time to the time of sunset and add one second
             sim.time = sim.scheduler.nextsunset(sim.time)+\
                 datetime.timedelta(seconds=1)

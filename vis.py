@@ -41,6 +41,35 @@ def get_sun(simpath):
     ss_times=np.array(ss_times)
     return sr_days,sr_times,ss_days,ss_times
 
+def get_targ_rise_set(simpath,targetname):
+    dt_fmt = '%Y%m%dT%H:%M:%S'
+    simname = simpath.split('/')[2]
+    summ = np.genfromtxt(simpath+simname+'.txt',dtype=None,delimiter=': ')
+    start = datetime.datetime.strptime(summ[1,1],dt_fmt)
+    strrises = np.genfromtxt(simpath+targetname+'rise.txt',dtype=None)
+    srises = [datetime.datetime.strptime(dstr,dt_fmt) for dstr in strrises]
+    sr_days = []
+    sr_times = []
+    for srise in srises:
+        sr_days.append((srise-start).days)
+        ttime = srise.time()
+        sr_times.append(ttime.hour+ttime.minute/60.+ttime.second/3600.)
+
+    sr_days=np.array(sr_days).astype(float)
+    sr_times=np.array(sr_times)
+
+    strsets = np.genfromtxt(simpath+targetname+'set.txt',dtype=None)
+    ssets = [datetime.datetime.strptime(dstr,dt_fmt) for dstr in strsets]
+    ss_days = []
+    ss_times = []
+    for sset in ssets:
+        ss_days.append((sset-start).days)
+        ttime = sset.time()
+        ss_times.append(ttime.hour+ttime.minute/60.+ttime.second/3600.)
+    ss_days=np.array(ss_days).astype(float)
+    ss_times=np.array(ss_times)
+    return sr_days,sr_times,ss_days,ss_times
+
 def get_target(simpath,targetname):
 
     dt_fmt = '%Y%m%dT%H:%M:%S'
@@ -80,8 +109,26 @@ if __name__ == '__main__':
         except:
             print('Bad name?')
             continue
-        plt.plot(sr_days,sr_times,'.',label='rises')
-        plt.plot(ss_days,ss_times,'.',label='sets')
+
+        plt.plot(sr_days,sr_times,label='sun rises')
+        plt.plot(ss_days,ss_times,label='sun sets')
+
+        try:
+            tr_days,tr_times,ts_days,ts_times=\
+                get_targ_rise_set(simpath,targetname)
+            tr_discont = np.where(np.abs(np.diff(tr_times)) >= 0.5)[0]+1
+            tr_days = np.insert(tr_days, tr_discont, np.nan)
+            tr_times = np.insert(tr_times, tr_discont, np.nan)
+            
+            ts_discont = np.where(np.abs(np.diff(ts_times)) >= 0.5)[0]+1
+            ts_days = np.insert(ts_days, ts_discont, np.nan)
+            ts_times = np.insert(ts_times, ts_discont, np.nan)
+        
+            plt.plot(tr_days,tr_times,label='target rises',ms=2)
+            plt.plot(ts_days,ts_times,label='target sets',ms=2)
+        except:
+            print('No rise/set data for target?')
+        # save plotting the obs for last for cleanliness in legend
         plt.plot(days,times,'.',label='obs')
         plt.legend()
         plt.show()
