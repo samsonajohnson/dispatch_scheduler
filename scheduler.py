@@ -43,6 +43,8 @@ class scheduler:
         self.moon = ephem.Moon()
         self.moon.compute(self.obs)
         
+        # seconds between three obs
+        self.sep_limit = 120.*60.
         # if you are using the simbad reader target list
         self.target_list = simbad_reader.read_simbad(self.targets_file)
         self.make_fixedBodies()
@@ -139,17 +141,23 @@ class scheduler:
         #S going to use simple HA weighting for now.
         for target in self.target_list:
             if self.is_observable(target):
-                target['weight'] = self.calc_weight(target)
+                target['weight'] = self.calc_weight1(target,timeof=self.time)
             else:
-                target['weight'] = -1
-        self.target_list = sorted(self.target_list, key=lambda x:x['weight'])
+                target['weight'] = -999
+        self.target_list = sorted(self.target_list, key=lambda x:-x['weight'])
         #pass
 
 
     def calc_weight(self,target):
+        """
+        simple, just going to weight for current ha sort of
+        weight = 1 - abs(HA/RA)
+        """
+        # temp set the horizon for targets
+        self.obs.date = self.time
+        lst = math.degrees(self.obs.sidereal_time())
         target['fixedbody'].compute(self.obs)
-        target['fixedbody'].alt
-        return target['magv']
+        return 1.-np.abs((lst-target['ra'])/target['ra'])
 
     def make_fixedBodies(self):
         for target in self.target_list:
@@ -160,34 +168,44 @@ class scheduler:
             target['fixedbody'].compute(self.obs)
 
         
-    def calc_weight1(self,target):
+    def calc_weight1(self,target,timeof=None):
+
+        # if now timeof provided, use current utc
+        if timeof == None:
+            timeof = datetime.datetime.utcnow()
+
         #S if the target was observed less than the separation time limit
         #S between observations, then we give it an 'unobservable' weight.
         
-        start_ha = - 0.5
-        if (datetime.datetime.utcnow()-target['last_obs']).total_seconds<\
-                self.sep_limit:
-            target['weight'] = -1
+        start_ha = - 2.0
         
+        if (timeof-target['last_obs']).total_seconds()<\
+                self.sep_limit:
+            return -1
+        
+        if target['observed']>3:
+            return -1
+
         #S weight for the first observation of a three obs run.
-        elif target['observations']%3==0:
+        elif target['observed']%3==0:
             #S the standard deviation of this is actually important as we 
             #S start to think about cadence. if we want to make cadence
             #S and the three obs weight complimetnary or something, a steeper
             #S drop off of the gaussian WILL matter when mixed with a cad term.
-            target['weight'] = np.exp(-((x-start_ha)**2./(2.*.5**2.)))
+            target_ha = (math.degrees(self.obs.sidereal_time())-target['ra'])/15.
+            return np.exp(-((target_ha-start_ha)**2./(2.*.5**2.)))
 
         #S weight for the second observation of a three obs run.
-        elif target['observations']%3 == 1:
+        elif target['observed']%3 == 1:
             #S there is a cap of 2. on this weight, which means a third 
             #S observation will always be prioritized.
-            target['weight'] = np.min(\
-                [2.,1.+((now-target['last_obs']).total_seconds()/60.-30.)/30.])
+            return np.min(\
+                [2.,1.+((timeof-target['last_obs']).total_seconds()/60.-30.)/30.])
 
         #S weight for the third observation of a three obs run, but note that
         #S there is no cap on this one.
-        elif target['observations']%3 == 2:
-            target['weight']=2.+((now-target['last_obs']).total_seconds()/60.\
+        elif target['observed']%3 == 2:
+            return 2.+((timeof-target['last_obs']).total_seconds()/60.\
                                      -30.)/30.
             
             
@@ -207,12 +225,14 @@ class scheduler:
             target['observed']=0
             # compute the target for the obs at time and horizon
             target['fixedbody'].compute(self.obs)
-            target['fixedbody'].compute(self.obs)
             # if it's neverup, flag it
             if target['fixedbody'].neverup:
                 target['neverup']=True
             else:
                 target['neverup']=False
+        
+        # reset to sun horizon
+        self.obs.horizon = str(self.sun_horizon)
                 
         
 
@@ -236,13 +256,7 @@ class scheduler:
 #            continue
         #S Check to see if we will try and observe past sunset
         
-        #TODO need coordinate propigation before this point, does pyephem do 
-        #TODO this?
-        # temporarily set the self.obs horizon to the minalt, will be 
-        # switched back after check
-        self.obs.date = timeof
-        self.obs.horizon = str(self.target_horizon)
-        target['fixedbody'].compute(self.obs)
+
         
         # check if the star will be rising sometime tonight
         #TODO:
@@ -251,22 +265,34 @@ class scheduler:
         if target['neverup']:
             #print(target['name']+" is never up")
             return False
+
+        #TODO need coordinate propigation before this point, does pyephem do 
+        #TODO this?
+        # temporarily set the self.obs horizon to the minalt, will be 
+        # switched back after check
+        self.obs.date = timeof
+        self.obs.horizon = str(self.target_horizon)
+        target['fixedbody'].compute(self.obs)
         
         # next is some nested if-statements for checking observability
         # still need to check if target will set before end of obs
 
         # check if the star is already in the sky
         if target['fixedbody'].alt > math.radians(float(self.target_horizon)):
-#            ipdb.set_trace()
-            if target['fixedbody'].alt < 0:
-                ipdb.set_trace()
             # see if we have enough time to observe
-            #print(target['name']+" is above horizon")
             if timeof+datetime.timedelta(minutes=target['exptime'])<\
                     self.nextsunrise(timeof,horizon=self.sun_horizon):
-                # there is time to observe
-                #print('Can currently observe '+target['name'])
-                return True
+                # check if it will be below horizon at the end of the obs
+                finish_time = timeof+\
+                    datetime.timedelta(minutes=target['exptime'])
+                self.obs.date=finish_time
+                target['fixedbody'].compute(self.obs)
+                if target['fixedbody'].alt>math.radians(self.target_horizon):
+                    # there is time to observe
+                    return True
+                else:
+                    # the target will set before fully observable
+                    return False
             else:
                 # there is not enought time to observe this target before the 
                 # sun rises
@@ -274,6 +300,7 @@ class scheduler:
                 return False
         else:
             return False
+
         
         # check to see if we are far enough from the moon
         #TODO need to test this, just a pass for now
@@ -299,20 +326,24 @@ class scheduler:
         return True
         pass
 
-    def nextsunrise(self, currenttime, horizon=0):
+    def nextsunrise(self, currenttime, horizon=-12):
+        self.obs.horizon=str(horizon)
         sunrise = self.obs.next_rising(ephem.Sun(),start=currenttime,\
                                            use_center=True).datetime()
         return sunrise
-    def nextsunset(self, currenttime, horizon=0):
+    def nextsunset(self, currenttime, horizon=-12):
+        self.obs.horizon=str(horizon)
         sunset = self.obs.next_setting(ephem.Sun(), start=currenttime,\
                                            use_center=True).datetime()
         return sunset
 
-    def prevsunrise(self, currenttime, horizon=0):
+    def prevsunrise(self, currenttime, horizon=-12):
+        self.obs.horizon=str(horizon)
         sunrise = self.obs.previous_rising(ephem.Sun(), start=currenttime,\
                                            use_center=True).datetime()
         return sunrise
-    def prevsunset(self, currenttime, horizon=0):
+    def prevsunset(self, currenttime, horizon=-12):
+        self.obs.horizon=str(horizon)
         sunset = self.obs.previous_setting(ephem.Sun(), start=currenttime,\
                                            use_center=True).datetime()
         return sunset

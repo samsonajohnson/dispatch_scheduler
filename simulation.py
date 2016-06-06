@@ -5,6 +5,7 @@ import scheduler
 import telescope
 import datetime
 import math
+import random
 import sys
 import os
 import glob
@@ -124,7 +125,16 @@ class simulation:
         pass
                                    
                       
-
+    def record_sun(self):
+        with open(self.sim_path+'sunset.txt','a') as sunfile:
+            # the time the sunsets
+            sstime = self.scheduler.nextsunset(sim.time)
+            sunfile.write(sstime.strftime(self.dt_fmt+'\n'))
+        with open(self.sim_path+'sunrise.txt','a') as sunfile:
+            # the time the sunsets
+            srtime = self.scheduler.nextsunrise(sim.time)
+            sunfile.write(srtime.strftime(self.dt_fmt+'\n'))
+            
      
                        
 
@@ -134,21 +144,25 @@ if __name__ == '__main__':
 #    ipdb.set_trace()
     # start off by making a simulation class
     sim = simulation('simulation.ini')
+    ipdb.set_trace()
+    random.shuffle(sim.scheduler.target_list)
+    sim.scheduler.target_list=sim.scheduler.target_list[:40]
 #    targetlist=simbad_reader.read_simbad('./secret/eta_list.txt')
 #    for target in targetlist:
 #        sim.write_target_file(target)
 #    sim.update_time(datetime.datetime.utcnow())
     sim.scheduler.prep_night()
+    # just a holder for last obs, two days prior to start to make irelevant
+    for target in sim.scheduler.target_list:
+        target['last_obs'] = sim.starttime-datetime.timedelta(days=2)
     sim.scheduler.calculate_weights()
     weights = []
     magvs = []
-    for target in sim.scheduler.target_list:
-        magvs.append(target['magv'])
-        weights.append(target['weight'])
     i=1
     obs_count=0
     total_exp = 0
     setimes = []
+    ipdb.set_trace()
     # while we are still in the simulation time frame
     while sim.time < sim.endtime:
         sim.update_time(sim.time)
@@ -157,14 +171,13 @@ if __name__ == '__main__':
         if sim.time < sim.scheduler.nextsunset(sim.time) and\
                 sim.scheduler.prevsunset(sim.time)<\
                 sim.scheduler.prevsunrise(sim.time):
-
+            # record the next sunrise and set times
+            sim.record_sun()
             # change the current time to the time of sunset and add one second
             sim.time = sim.scheduler.nextsunset(sim.time)+\
                 datetime.timedelta(seconds=1)
             sim.update_time(sim.time)
             sim.scheduler.prep_night()
-
-            sim.time+=datetime.timedelta(minutes=10)
             # end iteration
             continue
         # if the current time is before the next sunrise and the previous
@@ -173,12 +186,22 @@ if __name__ == '__main__':
         if sim.time < sim.scheduler.nextsunrise(sim.time) and \
                 sim.scheduler.prevsunrise(sim.time)<\
                 sim.scheduler.prevsunset(sim.time):
-
+            # (re)calculate the weights, which also orders them by weight
+            sim.scheduler.calculate_weights()
+#            for target in sim.scheduler.target_list:
+#                print target['weight']
+#            ipdb.set_trace()
             for target in sim.scheduler.target_list:
-                if sim.scheduler.is_observable(target) and \
-                        target['observed']==0:
+                # if the top target is still less than zero, wait five minutes
+                if target['weight']<0.:
+                    sim.time+=datetime.timedelta(minutes=5)
+                    break
+                if sim.scheduler.is_observable(target):
                     total_exp += sim.calc_exptime(target)
-                    target['observed']=1
+                    target['observed']+=1
+#                    if target['observed']>1:
+#                        ipdb.set_trace()
+                    target['last_obs']=sim.time
                     sim.record_observation(target)
                     obs_count+=1
 #                    ipdb.set_trace()
