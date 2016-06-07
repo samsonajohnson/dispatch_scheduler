@@ -7,7 +7,9 @@ import numpy as np
 import datetime
 import ephem
 import glob
+import simbad_reader
 import ipdb
+import math
 
 def singletarget(sim,target):
     pass
@@ -93,48 +95,125 @@ def get_target(simpath,targetname):
     times = np.array(times)
     return days,times,alts
 
+def plot_target(simpath,targetname):
+    
+    sr_days,sr_times,ss_days,ss_times = get_sun(simpath)
+    try:
+        days,times,alts = get_target(simpath,targetname)
+    except:
+        print('Bad pick, try again')
+        return
+    figt = plt.figure(figsize=(11,6))
+    ax1 = figt.add_subplot(1,1,1)
+    ax1.plot(sr_days,sr_times,label='sun rises')
+    ax1.plot(ss_days,ss_times,label='sun sets')
+    
+    try:
+        tr_days,tr_times,ts_days,ts_times=\
+            get_targ_rise_set(simpath,targetname)
+        tr_discont = np.where(np.abs(np.diff(tr_times)) >= 0.5)[0]+1
+        tr_days = np.insert(tr_days, tr_discont, np.nan)
+        tr_times = np.insert(tr_times, tr_discont, np.nan)
+        
+        ts_discont = np.where(np.abs(np.diff(ts_times)) >= 0.5)[0]+1
+        ts_days = np.insert(ts_days, ts_discont, np.nan)
+        ts_times = np.insert(ts_times, ts_discont, np.nan)
 
+        ax1.plot(tr_days,tr_times,label='target rises',ms=2)
+        ax1.plot(ts_days,ts_times,label='target sets',ms=2)
+    except:
+        print('No rise/set data for target?')
+        # save plotting the obs for last for cleanliness in legend
+    ax1.plot(days,times,'.',label='obs')
+    ax1.axis([-.1*len(sr_days),len(sr_days)+.1*len(sr_days),\
+                    np.min(ss_times)-.2*np.min(ss_times),\
+                    np.max(sr_times)+.2*np.max(sr_times)])
+
+    box = ax.get_position()
+    ax1.set_position([box.x0, box.y0, box.width * 1.2, box.height])
+    
+    # Put a legend to the right of the current axis
+    ax1.legend(loc='center left', bbox_to_anchor=(1, 0.5),borderaxespad=0.)
+    title_str =('%s: (%0.2f,%0.2f), Number of obs: %f')%(target['name'],target['ra'],target['dec'],target['num_obs'])
+
+    ax1.set_title(title_str)
+#    ax2 = figt.add_subplot(2,1,2)
+#    ax2.plot(days,alts,'.')
+    plt.show()
+
+def onpick(event,simpath,target_list):
+
+    if event.artist!=bline: return True
+    N=len(event.ind)
+    if not N: return True
+
+    thisstar = event.artist
+    xdata,ydata = thisstar.get_data()
+    ind = event.ind
+    print xdata[ind][0]
+    print ydata[ind][0]
+    for target in target_list:
+        if xdata[ind][0] == target['ra'] and ydata[ind][0] == target['dec']:
+            plot_target(simpath,target['name'])
+            plt.show()
+            break
+    return True
 if __name__ == '__main__':
-#    ipdb.set_trace()
+    ipdb.set_trace()
+    # get the full target list
+    target_list = simbad_reader.read_simbad('./secret/eta_list.txt')
     simnumber = raw_input('Enter sim number: ')
     simpath = './results/20160606.'+simnumber+'/'
-    targetname = 'HD95128'
+    
+    all_ras = []
+    all_decs = []
+    max_num_obs = 0
+    min_num_obs = 3000
+    num_stars_obs=0
+    for target in target_list:
 
-
-    sr_days,sr_times,ss_days,ss_times = get_sun(simpath)
-    while True:
-        targetname = raw_input('Enter target name: ')
+        all_ras.append(target['ra'])
+        all_decs.append(target['dec'])
         try:
-            days,times,alts = get_target(simpath,targetname)
+            tdays,ttimes,alts = get_target(simpath,target['name'])
+            target['num_obs'] = len(ttimes)
+            num_stars_obs+=1
+            if target['num_obs']>max_num_obs:
+                max_num_obs = target['num_obs']
+            if target['num_obs']<min_num_obs:
+                min_num_obs = target['num_obs']
         except:
-            print('Bad name?')
-            continue
+            target['num_obs'] = 0
+    print(num_stars_obs)
 
-        plt.plot(sr_days,sr_times,label='sun rises')
-        plt.plot(ss_days,ss_times,label='sun sets')
+    
+    # for mollweide
+#    all_ras=np.radians(np.array(all_ras)-180.)
+#    all_decs=np.radians(np.array(all_decs))
+    fig = plt.figure()
+    ax = fig.add_subplot(111)#,projection='mollweide')
+    bline, = ax.plot(all_ras,all_decs,'.',zorder=1,picker=5)
+    for target in target_list:
 
-        try:
-            tr_days,tr_times,ts_days,ts_times=\
-                get_targ_rise_set(simpath,targetname)
-            tr_discont = np.where(np.abs(np.diff(tr_times)) >= 0.5)[0]+1
-            tr_days = np.insert(tr_days, tr_discont, np.nan)
-            tr_times = np.insert(tr_times, tr_discont, np.nan)
-            
-            ts_discont = np.where(np.abs(np.diff(ts_times)) >= 0.5)[0]+1
-            ts_days = np.insert(ts_days, ts_discont, np.nan)
-            ts_times = np.insert(ts_times, ts_discont, np.nan)
-        
-            plt.plot(tr_days,tr_times,label='target rises',ms=2)
-            plt.plot(ts_days,ts_times,label='target sets',ms=2)
-        except:
-            print('No rise/set data for target?')
-        # save plotting the obs for last for cleanliness in legend
-        plt.plot(days,times,'.',label='obs')
-        plt.legend()
-        plt.show()
-        plt.plot(days,alts,'.')
-        plt.show()
+        # subtract 180 to center
+        ra = target['ra']
+        dec = target['dec']
+        # for mollweide
+#        ra = math.radians(target['ra']-180.)
+#        dec = math.radians(target['dec'])
+        if target['num_obs'] == 0:
+            ax.scatter(ra,dec,color='grey',zorder=2)
+            ax.text(ra,dec,target['name'],size=6)
+        else:
+            ax.scatter(ra,dec,c=target['num_obs'],zorder=2,
+                         vmin=min_num_obs,vmax=max_num_obs,cmap=plt.cm.copper)
+            ax.text(ra,dec,target['name'],size=6)
+    ax.grid()
+#    ax.set_xticklabels(['2h','4h','6h','8h','10h','12h','14h','16h','18h','20h','22h','24h'])
+    fig.canvas.mpl_connect('pick_event',lambda event: onpick(event,simpath,target_list))
+    plt.show()
+    
     ipdb.set_trace()
-    ipdb.set_trace()
+
         
         
