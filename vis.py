@@ -10,6 +10,7 @@ import glob
 import simbad_reader
 import ipdb
 import math
+import os
 
 def singletarget(sim,target):
     pass
@@ -95,11 +96,11 @@ def get_target(simpath,targetname):
     times = np.array(times)
     return days,times,alts
 
-def plot_target(simpath,targetname):
+def plot_target(simpath,target):
     
     sr_days,sr_times,ss_days,ss_times = get_sun(simpath)
     try:
-        days,times,alts = get_target(simpath,targetname)
+        days,times,alts = get_target(simpath,target['name'])
     except:
         print('Bad pick, try again')
         return
@@ -107,10 +108,33 @@ def plot_target(simpath,targetname):
     ax1 = figt.add_subplot(1,1,1)
     ax1.plot(sr_days,sr_times,label='sun rises')
     ax1.plot(ss_days,ss_times,label='sun sets')
+
+    """
+    pltdays = []
+    maxplt = []
+    for ind in range(len(sr_times)):
+        if sr_times[ind]>tr_times[ind] and tr_times[ind]>ts_times[ind]:
+            pltdays.append(ind)
+            maxplt.append(sr_times[ind])
+        elif sr_times[ind]>tr_times[ind] and tr_times[ind]>ss_times[ind]:
+            pltdays.append(ind)
+            maxplt.append(sr_times[ind])
+        elif ts_times[ind]<sr_times[ind] and ts_times[ind]>ss_times[ind]:
+            pltdays.append(ind)
+            maxplt.append(ts_times[ind])
+
+#    maxplt = np.minimum(sr_times,ts_times)
+#    minplt = np.maximum(ss_times,tr_times)
+#    minplt = np.minimum(minplt,sr_times)
+    ax1.plot(pltdays,maxplt,'.',label='minplt')
+#    ax1.plot(sr_days,maxplt,label='maxplt')
     
+#    ax1.fill_between(sr_days,minplt,maxplt,alpha=.5,where=minplt<maxplt,facecolor='yellow')
+#    ax1.fill_between(sr_days,sr_times,ss_times,where=(tr_times[1:]<=sr_times),alpha=.5,facecolor='yellow')
+    """
     try:
         tr_days,tr_times,ts_days,ts_times=\
-            get_targ_rise_set(simpath,targetname)
+            get_targ_rise_set(simpath,target['name'])
         tr_discont = np.where(np.abs(np.diff(tr_times)) >= 0.5)[0]+1
         tr_days = np.insert(tr_days, tr_discont, np.nan)
         tr_times = np.insert(tr_times, tr_discont, np.nan)
@@ -118,12 +142,13 @@ def plot_target(simpath,targetname):
         ts_discont = np.where(np.abs(np.diff(ts_times)) >= 0.5)[0]+1
         ts_days = np.insert(ts_days, ts_discont, np.nan)
         ts_times = np.insert(ts_times, ts_discont, np.nan)
-
+    
         ax1.plot(tr_days,tr_times,label='target rises',ms=2)
         ax1.plot(ts_days,ts_times,label='target sets',ms=2)
+    
     except:
         print('No rise/set data for target?')
-        # save plotting the obs for last for cleanliness in legend
+    # save plotting the obs for last for cleanliness in legend
     ax1.plot(days,times,'.',label='obs')
     ax1.axis([-.1*len(sr_days),len(sr_days)+.1*len(sr_days),\
                     np.min(ss_times)-.2*np.min(ss_times),\
@@ -134,9 +159,16 @@ def plot_target(simpath,targetname):
     
     # Put a legend to the right of the current axis
     ax1.legend(loc='center left', bbox_to_anchor=(1, 0.5),borderaxespad=0.)
-    title_str =('%s: (%0.2f,%0.2f), Number of obs: %f')%(target['name'],target['ra'],target['dec'],target['num_obs'])
+    title_str =('%s: (%0.2f,%0.2f), Number of obs: %.1f')%(target['name'],target['ra'],target['dec'],target['num_obs'])
+    
+
+    dt_fmt = '%Y%m%dT%H:%M:%S'
+    simname = simpath.split('/')[2]
+    summ = np.genfromtxt(simpath+simname+'.txt',dtype=None,delimiter=': ')
 
     ax1.set_title(title_str)
+    ax1.set_xlabel('Days from '+summ[1,1][:8])
+    ax1.set_ylabel('Hours from UTC 00:00:00')
 #    ax2 = figt.add_subplot(2,1,2)
 #    ax2.plot(days,alts,'.')
     plt.show()
@@ -154,7 +186,8 @@ def onpick(event,simpath,target_list):
     print ydata[ind][0]
     for target in target_list:
         if xdata[ind][0] == target['ra'] and ydata[ind][0] == target['dec']:
-            plot_target(simpath,target['name'])
+            print target['name']
+            plot_target(simpath,target)
             plt.show()
             break
     return True
@@ -163,7 +196,8 @@ if __name__ == '__main__':
     # get the full target list
     target_list = simbad_reader.read_simbad('./secret/eta_list.txt')
     simnumber = raw_input('Enter sim number: ')
-    simpath = './results/20160606.'+simnumber+'/'
+    simpath = glob.glob('./results/*.'+simnumber+'/')[0]
+    os.stat(simpath)
     
     all_ras = []
     all_decs = []
@@ -202,13 +236,17 @@ if __name__ == '__main__':
 #        ra = math.radians(target['ra']-180.)
 #        dec = math.radians(target['dec'])
         if target['num_obs'] == 0:
-            ax.scatter(ra,dec,color='grey',zorder=2)
-            ax.text(ra,dec,target['name'],size=6)
+            ax.scatter(ra,dec,color='grey',s=20,zorder=2)
+            ax.text(ra,dec,target['name'],size=7)
         else:
-            ax.scatter(ra,dec,c=target['num_obs'],zorder=2,
+            ax.scatter(ra,dec,c=target['num_obs'],s=20,zorder=2,
                          vmin=min_num_obs,vmax=max_num_obs,cmap=plt.cm.copper)
-            ax.text(ra,dec,target['name'],size=6)
+            ax.text(ra,dec,target['name'],size=7)
     ax.grid()
+    ax.axis([-.5,24.9,-40,95])
+    ax.set_title('Eta Earth list')
+    ax.set_xlabel('Right Ascension [hours]')
+    ax.set_ylabel('Declination [$^\circ$]')
 #    ax.set_xticklabels(['2h','4h','6h','8h','10h','12h','14h','16h','18h','20h','22h','24h'])
     fig.canvas.mpl_connect('pick_event',lambda event: onpick(event,simpath,target_list))
     plt.show()

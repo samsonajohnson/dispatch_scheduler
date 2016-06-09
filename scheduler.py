@@ -67,6 +67,7 @@ class scheduler:
             print('ERROR accessing configuration file: ' + self.config_file)
             sys.exit()
 
+
     def calc_ha(self,target):
         self.site.obs.date = datetime.datetime.utcnow()
         lst = (self.site.obs.sidereal_time()*180./np.pi)/15.
@@ -162,9 +163,10 @@ class scheduler:
     def make_fixedBodies(self):
         for target in self.target_list:
             target['fixedbody'] = ephem.FixedBody()
-            target['fixedbody']._ra = target['ra']
-            target['fixedbody']._dec = target['dec']
-            target['fixedbody']._epoch = 2000.0
+#            ipdb.set_trace()
+            target['fixedbody']._ra = str(target['ra'])
+            target['fixedbody']._dec = str(target['dec'])
+#            target['fixedbody']._epoch = 2000.0
             target['fixedbody'].compute(self.obs)
 
         
@@ -266,6 +268,14 @@ class scheduler:
             #print(target['name']+" is never up")
             return False
 
+        # check if the target is separated enough from the moon
+        #TODO test
+        moon = ephem.Moon()
+        moon.compute(self.obs)
+        if ephem.separation(moon,target['fixedbody'])<self.min_moon_sep:
+            pass# return False
+
+
         #TODO need coordinate propigation before this point, does pyephem do 
         #TODO this?
         # temporarily set the self.obs horizon to the minalt, will be 
@@ -302,29 +312,11 @@ class scheduler:
             return False
 
         
-        # check to see if we are far enough from the moon
-        #TODO need to test this, just a pass for now
-        moon = ephem.Moon()
-        moon.compute(self.obs)
-        if ephem.separation(moon,target['fixedbody'])<self.min_moon_sep:
-            pass# return False
         
         # reset the horizon for the sun
         self.obs.horizon = str(self.sun_horizon)
-        
-        
-#        if (datetime.datetime.utcnow()+\
-#                datetime.timedelta(seconds=target['exptime']))\
-#                >self.site.NautTwilEnd():
-#            pass
-#            continue
-        #S check to see if the target will go below horizon before 
-        #S finishing the observation.
-            
-        #S if all checks pass, we want to return the chosen target dict
 
-        return True
-        pass
+
 
     def nextsunrise(self, currenttime, horizon=-12):
         self.obs.horizon=str(horizon)

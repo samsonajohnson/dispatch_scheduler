@@ -40,8 +40,9 @@ def read_simbad(simbad_output):
             if 'coord' in key:
                 if len(spltarg[ind].split())>2:
 #                target_list[-1][key] = collections.OrderedDict()
+#                    ipdb.set_trace()
                     ra = " ".join(spltarg[ind].split()[0:3]).split()
-                    ra = (float(ra[0])+float(ra[1])/60.+float(ra[2])/3600.)*15.
+                    ra = (float(ra[0])+float(ra[1])/60.+float(ra[2])/3600.)
                     dec = " ".join(spltarg[ind].split()[3:]).split()
                     if float(dec[0])<0:
                         dec=float(dec[0])-float(dec[1])/60.-float(dec[2])/3600.

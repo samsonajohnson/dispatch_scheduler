@@ -9,6 +9,7 @@ import random
 import sys
 import os
 import glob
+import subprocess
 from configobj import ConfigObj
 import simbad_reader
 
@@ -94,11 +95,35 @@ class simulation:
         tele_list = [x-1 for x in tele_list]
     
     def write_target_file(self,target):
-        header = 'obs_start \t obs_end \t duration \t altitude \t azimuth'
+        header = 'obs_start \t obs_end \t duration \t altitude \t azimuth '+\
+            '\t quality'
         with open(self.sim_path+target['name']+'.txt','w') as target_file:
-            target_file.write(header+'\n\n')
+            target_file.write(header+'\n')
+
     def calc_exptime(self,target):
         return target['exptime']
+
+
+    def get_obs_history(self,target,prev_obs=1,simpath=None):
+        if simpath == None:
+            simpath = self.sim_path
+        # a function that 'tail's a target file to get the last prev_obs and 
+        # places the details in a list?
+        target_file = simpath+target['name']+'.txt'
+        raw_obs=\
+            subprocess.check_output(['tail','-n',str(prev_obs),target_file])
+        obs_lines = raw_obs.split('\n')[:-1]
+        obs_list = []
+        for line in obs_lines:
+            line = line.split('\t')
+            line[0] = datetime.datetime.strptime(line[0],self.dt_fmt)
+            line[1] = datetime.datetime.strptime(line[1],self.dt_fmt)
+            line[2] = float(line[2])
+            line[3] = float(line[3])
+            line[4] = float(line[4])
+            obs_list.append(line)
+        return obs_list
+            
 
     def record_observation(self,target,telescopes=None):
         obs_start = self.time
@@ -108,6 +133,9 @@ class simulation:
         try: os.stat(self.sim_path+target['name']+'.txt')
         except: self.write_target_file(target)
         self.scheduler.obs.date=self.time
+        # the observation 'quality', or whether it was a good observation or 
+        # not (1 is good, 0 is unusable)
+        obs_quality = 1
         target['fixedbody'].compute(self.scheduler.obs)
         alt = target['fixedbody'].alt
         azm = target['fixedbody'].az
@@ -116,9 +144,10 @@ class simulation:
         with open(self.sim_path+target['name']+'.txt','a') as target_file:
             obs_string = obs_start.strftime(self.dt_fmt)+'\t'+\
                 obs_end.strftime(self.dt_fmt)+'\t'+\
-                '%.2f'%duration+'\t'+\
-                '%.3f'%math.degrees(alt)+'\t'+\
-                '%.3f'%math.degrees(azm)+'\t'+\
+                '%07.2f'%duration+'\t'+\
+                '%06.2f'%math.degrees(alt)+'\t'+\
+                '%07.2f'%math.degrees(azm)+' \t '+\
+                '%i'%obs_quality+\
                 '\n'         
             print(target['name']+': '+obs_string)
             target_file.write(obs_string)
@@ -160,9 +189,10 @@ if __name__ == '__main__':
 #    ipdb.set_trace()
     # start off by making a simulation class
     sim = simulation('simulation.ini')
-    ipdb.set_trace()
+    
     random.shuffle(sim.scheduler.target_list)
-    sim.scheduler.target_list=sim.scheduler.target_list[:40]
+    sim.scheduler.target_list=sim.scheduler.target_list[:60]
+    ipdb.set_trace()
 #    targetlist=simbad_reader.read_simbad('./secret/eta_list.txt')
 #    for target in targetlist:
 #        sim.write_target_file(target)
@@ -217,13 +247,10 @@ if __name__ == '__main__':
                 if sim.scheduler.is_observable(target):
                     total_exp += sim.calc_exptime(target)
                     target['observed']+=1
-#                    if target['observed']>1:
-#                        ipdb.set_trace()
                     target['last_obs']=sim.time
                     sim.record_observation(target)
                     obs_count+=1
-#                    ipdb.set_trace()
-                    sim.scheduler.is_observable(target)
+#                    sim.scheduler.is_observable(target)
                     sim.time+=datetime.timedelta(minutes=target['exptime'])
                     break
             sim.time+=datetime.timedelta(minutes=5)
