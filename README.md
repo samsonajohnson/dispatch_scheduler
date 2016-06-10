@@ -4,7 +4,7 @@ A dispatch scheduler simulation that can be modified for personal work. Intended
 All of the resulting information from a simulation run is record in the results
 directory. Each simulation creates its own directory, with a title of 
 YYYYMMDD.#####, where the YYYYMMDD is the date the simulation was run, and the
-##### is an index of the simulatoin in the folder. E.G. for two simulations 
+\#\#\#\#\# is an index of the simulatoin in the folder. E.G. for two simulations 
 run on 20160101 and one simulation run on 20160102, the directories produced 
 would be 20160101.00001, 20160101.00002, and 20160102.00003. 
 
