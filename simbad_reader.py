@@ -1,4 +1,9 @@
-
+"""
+Functions to read a ''general'' output file from Simbad, used in reading the 
+target list, but will be replaced by the google speadsheet with all the target
+information. Produces a list of dictionaries, which is the same format that the
+spreadsheet reader will produce.
+"""
 
 import ipdb
 import collections

@@ -1,7 +1,11 @@
 #S was going to make targets their own classes, but might as well preserve 
 #S dicts. we can just have the scheduler perform functions on them and update
 #S values. 
-
+"""
+The scheduler class, which performs all checks on observability of targets,
+calculates weights, and some ephem on sun, moon. Will contain some other 
+utility functions.
+"""
 
 import numpy as np
 import math

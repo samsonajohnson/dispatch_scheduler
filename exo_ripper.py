@@ -1,4 +1,7 @@
-
+"""
+A quick program for stripping the output from exoplanets.org
+Temporary, and probably useless.
+"""
 import ipdb
 
 if __name__ == '__main__':
