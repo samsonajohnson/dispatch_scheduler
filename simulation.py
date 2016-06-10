@@ -66,6 +66,8 @@ class simulation:
         today_str = datetime.datetime.utcnow().strftime('%Y%m%d')
         self.sim_name = today_str+'.%05d'%self.sim_ind
         self.sim_path = './results/'+self.sim_name+'/'
+        # to give sim_path to scheduler
+        self.scheduler.sim_path = self.sim_path
         try: os.stat(self.sim_path)
         except: os.mkdir(self.sim_path)
         with open(self.sim_path+self.sim_name+'.txt','w') as wfile:
@@ -144,13 +146,15 @@ class simulation:
         with open(self.sim_path+target['name']+'.txt','a') as target_file:
             obs_string = obs_start.strftime(self.dt_fmt)+'\t'+\
                 obs_end.strftime(self.dt_fmt)+'\t'+\
-                '%07.2f'%duration+'\t'+\
+                '%08.2f'%duration+'\t'+\
                 '%06.2f'%math.degrees(alt)+'\t'+\
                 '%07.2f'%math.degrees(azm)+' \t '+\
                 '%i'%obs_quality+\
                 '\n'         
             print(target['name']+': '+obs_string)
             target_file.write(obs_string)
+        obs_list = [obs_start,obs_end,duration,alt,azm,obs_quality]
+        target['last_obs'].append(obs_list)
         pass
 
     def record_target(self,target):
@@ -197,10 +201,11 @@ if __name__ == '__main__':
 #    for target in targetlist:
 #        sim.write_target_file(target)
 #    sim.update_time(datetime.datetime.utcnow())
-    sim.scheduler.prep_night()
+    sim.scheduler.prep_night(init_run=True)
     # just a holder for last obs, two days prior to start to make irelevant
     for target in sim.scheduler.target_list:
-        target['last_obs'] = sim.starttime-datetime.timedelta(days=2)
+        sim.record_observation(target)
+#        target['last_obs'] = sim.starttime-datetime.timedelta(days=2)
     sim.scheduler.calculate_weights()
     weights = []
     magvs = []
@@ -243,16 +248,18 @@ if __name__ == '__main__':
                 # if the top target is still less than zero, wait five minutes
                 if target['weight']<0.:
                     sim.time+=datetime.timedelta(minutes=5)
+                    print('Nothing observed')
                     break
-                if sim.scheduler.is_observable(target):
-                    total_exp += sim.calc_exptime(target)
-                    target['observed']+=1
-                    target['last_obs']=sim.time
-                    sim.record_observation(target)
-                    obs_count+=1
-#                    sim.scheduler.is_observable(target)
-                    sim.time+=datetime.timedelta(minutes=target['exptime'])
-                    break
+#                if sim.scheduler.is_observable(target):
+                total_exp += sim.calc_exptime(target)
+                if target['observed']>3:
+                    ipdb.set_trace()
+                target['observed']+=1
+#                target['last_obs']=sim.time
+                sim.record_observation(target)
+                obs_count+=1
+                sim.time+=datetime.timedelta(minutes=target['exptime'])
+                break
             sim.time+=datetime.timedelta(minutes=5)
     print obs_count
     ipdb.set_trace()

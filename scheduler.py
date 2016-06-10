@@ -15,6 +15,7 @@ import ipdb
 #import env
 import datetime
 import time
+import subprocess
 from configobj import ConfigObj
 
 ###
@@ -27,6 +28,7 @@ class scheduler:
         #S LST and such
         self.base_directory = base_directory
         self.config_file = config_file
+        self.dt_fmt = '%Y%m%dT%H:%M:%S'
         # load the config file
         self.load_config()
         # make the observer which will be used in calculations and what not
@@ -170,7 +172,11 @@ class scheduler:
             target['fixedbody'].compute(self.obs)
 
         
-    def calc_weight1(self,target,timeof=None):
+    def calc_weight1(self,target,timeof=None,obspath=None):
+
+        # need some sort of default for the obs path
+        if obspath == None:
+            obspath = self.sim_path
 
         # if now timeof provided, use current utc
         if timeof == None:
@@ -179,39 +185,63 @@ class scheduler:
         #S if the target was observed less than the separation time limit
         #S between observations, then we give it an 'unobservable' weight.
         
-        start_ha = - 2.0
-        
-        if (timeof-target['last_obs']).total_seconds()<\
-                self.sep_limit:
-            return -1
-        
-        if target['observed']>3:
-            return -1
+        start_ha = -self.sep_limit/3600.
+        try:
+            if (timeof-target['last_obs'][-1][0]).total_seconds()<\
+                    self.sep_limit:
+                return -1.
+        except:
+            ipdb.set_trace()
+                
 
+        if target['observed']>3:
+            return -1.
+
+        cad_weight = 0.
+        try:
+            
+ #           if os.stat(obspath+target['name']+'.txt'):
+#                obs_hist = self.get_obs_history(target,simpath=obspath)
+            
+                cad_weight = 0.
+                # if the last obs time was great than four hours ago, add a bit
+#                ipdb.set_trace()
+#                print (timeof-obs_hist[-1][1]).total_seconds()>4.*3600.
+                if (timeof-target['last_obs'][-1][0]).total_seconds()>24.*3600.:
+#                    print('cad boost to ' +target['name'])
+                    cad_weight = 1.
+        except:
+            print('boop\n')
+            cad_weight = 1.
+        
         #S weight for the first observation of a three obs run.
-        elif target['observed']%3==0:
+        if target['observed']%3==0:
             #S the standard deviation of this is actually important as we 
             #S start to think about cadence. if we want to make cadence
             #S and the three obs weight complimetnary or something, a steeper
             #S drop off of the gaussian WILL matter when mixed with a cad term.
-            target_ha = (math.degrees(self.obs.sidereal_time())-target['ra'])/15.
-            return np.exp(-((target_ha-start_ha)**2./(2.*.5**2.)))
+            target_ha=(math.degrees(self.obs.sidereal_time())-target['ra'])
+            threeobs_weight= np.exp(-((target_ha-start_ha)**2./(2.*.5**2.)))
 
         #S weight for the second observation of a three obs run.
         elif target['observed']%3 == 1:
             #S there is a cap of 2. on this weight, which means a third 
             #S observation will always be prioritized.
-            return np.min(\
-                [2.,1.+((timeof-target['last_obs']).total_seconds()/60.-30.)/30.])
+            threeobs_weight=np.min(\
+                [2.,1.+((timeof-target['last_obs'][-1][0]).total_seconds()-\
+                            -self.sep_limit)/self.sep_limit])
 
         #S weight for the third observation of a three obs run, but note that
         #S there is no cap on this one.
         elif target['observed']%3 == 2:
-            return 2.+((timeof-target['last_obs']).total_seconds()/60.\
-                                     -30.)/30.
+            threeobs_weight=2.+\
+                ((timeof-target['last_obs'][-1][0]).total_seconds()-\
+                     self.sep_limit)/self.sep_limit
+
+        return threeobs_weight+cad_weight
             
             
-    def prep_night(self,timeof=None):
+    def prep_night(self,timeof=None,init_run=False):
         """
         A function to go through some processes that only need to be done at 
         the beginning of the night.
@@ -232,11 +262,46 @@ class scheduler:
                 target['neverup']=True
             else:
                 target['neverup']=False
-        
+                try:
+                    target['last_obs']=self.get_obs_history(target,prev_obs=1)
+                except:
+                    target['last_obs']=[]
+            if init_run == True:
+                try:
+                    target['last_obs']=self.get_obs_history(target,prev_obs=1)
+                except:
+                    target['last_obs']=[]
         # reset to sun horizon
         self.obs.horizon = str(self.sun_horizon)
                 
         
+    def get_obs_history(self,target,prev_obs=1,simpath=None):
+        if simpath == None:
+            simpath = self.sim_path
+        # a function that 'tail's a target file to get the last prev_obs and
+        # places the details in a list?
+        # add a line for the empty one at the end of a file?
+        target_file = simpath+target['name']+'.txt'
+        raw_obs=\
+            subprocess.check_output(['tail','-n',str(prev_obs),target_file])
+        obs_lines = raw_obs.split('\n')[:-1]
+        obs_list = []
+        for line in obs_lines:
+            try:
+                line = line.split('\t')
+                line[0] = datetime.datetime.strptime(line[0],self.dt_fmt)
+                line[1] = datetime.datetime.strptime(line[1],self.dt_fmt)
+                line[2] = float(line[2])
+                line[3] = float(line[3])
+                line[4] = float(line[4])
+                obs_list.append(line)
+            except:
+                # so it doesn't try and parse the header
+                pass
+        if obs_list is []:
+            ipdb.set_trace()
+        return obs_list
+
 
     def is_observable(self,target,timeof=None):
         # if the timeof obs is not provided, use the schedulers clock for the 
