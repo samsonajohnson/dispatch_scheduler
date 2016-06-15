@@ -160,11 +160,13 @@ class scheduler:
         simple, just going to weight for current ha sort of
         weight = 1 - abs(HA/RA)
         """
+        if target['observed']>1:
+            return -1
         # temp set the horizon for targets
         self.obs.date = self.time
-        lst = math.degrees(self.obs.sidereal_time())
+        lst = math.degrees(self.obs.sidereal_time())/15.
         target['fixedbody'].compute(self.obs)
-        return 1.-np.abs((lst-target['ra'])/target['ra'])
+        return 1.-np.abs((lst-target['ra'])/12.)
 
     def make_fixedBodies(self):
         for target in self.target_list:
@@ -188,8 +190,8 @@ class scheduler:
 
         #S if the target was observed less than the separation time limit
         #S between observations, then we give it an 'unobservable' weight.
-        
-        start_ha = -self.sep_limit/3600.
+        # just comment out if you want a random start time
+#        self.start_ha = -self.sep_limit/3600.
         try:
             if (timeof-target['last_obs'][-1][0]).total_seconds()<\
                     self.sep_limit:
@@ -225,7 +227,8 @@ class scheduler:
             #S and the three obs weight complimetnary or something, a steeper
             #S drop off of the gaussian WILL matter when mixed with a cad term.
             target_ha=(math.degrees(self.obs.sidereal_time())-target['ra'])
-            threeobs_weight= np.exp(-((target_ha-start_ha)**2./(2.*.5**2.)))
+            threeobs_weight= \
+                np.exp(-((target_ha-self.start_ha)**2./(2.*.5**2.)))
 
         #S weight for the second observation of a three obs run.
         elif target['observed']%3 == 1:
@@ -255,6 +258,10 @@ class scheduler:
         # temp set the horizon for targets
         self.obs.date = self.time
         self.obs.horizon = str(self.target_horizon)
+        # get a random starting hour angle normally distrubted around an hour
+        # angle of -2. this is for the three observations per night of MINERVA,
+        # and might be useless to you.
+        self.start_ha = np.random.normal(loc=-2.,scale=.5)
 
         for target in self.target_list:
             # reset targets observation counter for the night to zero

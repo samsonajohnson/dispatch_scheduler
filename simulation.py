@@ -5,6 +5,7 @@ import scheduler
 import telescope
 import datetime
 import math
+import numpy as np
 import random
 import sys
 import os
@@ -41,7 +42,9 @@ class simulation:
     def create_class_objects(self,tel_num=1):
         # create a scheduler for the sim
         self.scheduler = scheduler.scheduler('scheduler.ini')
-
+        # get the weather stats
+        
+        self.get_weather_probs('dailyprob.txt')
         # create the telescopes
         self.telescopes = []
         for ind in range(tel_num):
@@ -185,15 +188,33 @@ class simulation:
             sunfile.write(srtime.strftime(self.dt_fmt+'\n'))
             
      
-                       
+    def get_weather_probs(self,weatherfile=None):
+        self.weather_probs = np.genfromtxt(weatherfile)
+            
+    def check_weather(self,time):
+        # weather stats are for 365 day year, reusing value of 0101 if it is a 
+        # lead year. 
+        daynumber = (time.timetuple().tm_yday-1)%364
+        random.seed()
+        prob = random.uniform(0,1)
+        if prob > self.weather_probs[daynumber]:
+            return False
+        else:
+            return True
+
+        
 
 if __name__ == '__main__':
     import ipdb
+    
 
 #    ipdb.set_trace()
     # start off by making a simulation class
     sim = simulation('simulation.ini')
-    
+    # seed the random number generator so we get the same list of targets for 
+    # alias evalutions
+
+    random.seed(1)
     random.shuffle(sim.scheduler.target_list)
     sim.scheduler.target_list=sim.scheduler.target_list[:60]
     ipdb.set_trace()
@@ -230,6 +251,10 @@ if __name__ == '__main__':
             sim.time = sim.scheduler.nextsunset(sim.time)+\
                 datetime.timedelta(seconds=1)
             sim.update_time(sim.time)
+            if not sim.check_weather(sim.time):
+                print('NIGHT LOST DUE TO WEATHER')
+                sim.time = sim.scheduler.nextsunrise(sim.time)+\
+                    datetime.timedelta(seconds=1)
             sim.scheduler.prep_night()
             # end iteration
             continue

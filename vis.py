@@ -96,16 +96,30 @@ def get_target(simpath,targetname):
     times = np.array(times)
     return days,times,alts
 
+def window_function(freqs,times):
+    result = []
+    for freq in freqs:
+        result.append(np.sum(np.exp(-2j*np.pi*(1./freq)*times))/len(times))
+    return result
+    
+
 def plot_target(simpath,target):
     
     sr_days,sr_times,ss_days,ss_times = get_sun(simpath)
     try:
         days,times,alts = get_target(simpath,target['name'])
+        dec_times = days+times
     except:
         print('Bad pick, try again')
         return
-    figt = plt.figure(figsize=(11,6))
-    ax1 = figt.add_subplot(1,1,1)
+
+
+    figt = plt.figure()#figsize=(11,6))
+    ax2 = figt.add_subplot(2,1,2)
+    freqs = np.linspace(0,365,100000)
+    win_func = window_function(freqs,dec_times)
+    plt.plot(freqs,np.absolute(win_func))
+    ax1 = figt.add_subplot(2,1,1)
     ax1.plot(sr_days,sr_times,label='sun rises')
     ax1.plot(ss_days,ss_times,label='sun sets')
 
@@ -158,7 +172,7 @@ def plot_target(simpath,target):
     ax1.set_position([box.x0, box.y0, box.width * 1.2, box.height])
     
     # Put a legend to the right of the current axis
-    ax1.legend(loc='center left', bbox_to_anchor=(1, 0.5),borderaxespad=0.)
+    ax1.legend()#loc='center left', bbox_to_anchor=(1, 0.5),borderaxespad=0.)
     title_str =('%s: (%0.2f,%0.2f), Number of obs: %.1f')%(target['name'],target['ra'],target['dec'],target['num_obs'])
     
 
@@ -221,6 +235,8 @@ if __name__ == '__main__':
     print(num_stars_obs)
 
     
+
+
     # for mollweide
 #    all_ras=np.radians(np.array(all_ras)-180.)
 #    all_decs=np.radians(np.array(all_decs))
@@ -244,7 +260,7 @@ if __name__ == '__main__':
             ax.text(ra,dec,target['name'],size=7)
     ax.grid()
     ax.axis([-.5,24.9,-40,95])
-    ax.set_title('Eta Earth list')
+    ax.set_title('Eta Earth list '+simnumber)
     ax.set_xlabel('Right Ascension [hours]')
     ax.set_ylabel('Declination [$^\circ$]')
 #    ax.set_xticklabels(['2h','4h','6h','8h','10h','12h','14h','16h','18h','20h','22h','24h'])
