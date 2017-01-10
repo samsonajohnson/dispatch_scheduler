@@ -107,7 +107,7 @@ class scheduler:
         self.calculate_weights()
         #S sort the target list by weight, so that the list of dictionaries
         #S is now in descending order based on weight.
-        self.target_list = sorted(targetlist, key=lambda x:x['weight'])
+        self.target_list = sorted(self.target_list, key=lambda x:x['weight'])
         for target in self.target_list:
             if self.can_observe(target):
                 return target
@@ -148,7 +148,7 @@ class scheduler:
         #S going to use simple HA weighting for now.
         for target in self.target_list:
             if self.is_observable(target):
-                target['weight'] = self.calc_weight1(target,timeof=self.time)
+                target['weight'] = self.calc_weight(target)#,timeof=self.time)
             else:
                 target['weight'] = -999
         self.target_list = sorted(self.target_list, key=lambda x:-x['weight'])
@@ -160,7 +160,7 @@ class scheduler:
         simple, just going to weight for current ha sort of
         weight = 1 - abs(HA/RA)
         """
-        if target['observed']>1:
+        if target['observed']>0:
             return -1
         # temp set the horizon for targets
         self.obs.date = self.time
@@ -188,20 +188,31 @@ class scheduler:
         if timeof == None:
             timeof = datetime.datetime.utcnow()
 
+        if target['observed']>3:
+            return -1.
+        
+
+        # check to see if the target has an separation limit in it's list of 
+        # dictionary keys, and if it does, set the observation separation
+        # limit to that. needs to be in seconds
+        if 'sep_limit' in target.keys():
+            obs_sep_limit = target['sep_limit']
+        else:
+            # if there is no such key, we will use a default of 2 hours
+            obs_sep_limit = 120.*60.
+
         #S if the target was observed less than the separation time limit
         #S between observations, then we give it an 'unobservable' weight.
         # just comment out if you want a random start time
 #        self.start_ha = -self.sep_limit/3600.
         try:
             if (timeof-target['last_obs'][-1][0]).total_seconds()<\
-                    self.sep_limit:
+                    obs_sep_limit:
                 return -1.
         except:
             ipdb.set_trace()
                 
 
-        if target['observed']>3:
-            return -1.
 
         cad_weight = 0.
         try:
@@ -213,11 +224,12 @@ class scheduler:
                 # if the last obs time was great than four hours ago, add a bit
 #                ipdb.set_trace()
 #                print (timeof-obs_hist[-1][1]).total_seconds()>4.*3600.
-                if (timeof-target['last_obs'][-1][0]).total_seconds()>24.*3600.:
+                if (timeof-target['last_obs'][-1][0]).total_seconds()>\
+                        24.*3600.:
 #                    print('cad boost to ' +target['name'])
                     cad_weight = 1.
         except:
-            print('boop\n')
+            print('error in determining cadweight for '+target['name']+'\n')
             cad_weight = 1.
         
         #S weight for the first observation of a three obs run.
@@ -235,15 +247,17 @@ class scheduler:
             #S there is a cap of 2. on this weight, which means a third 
             #S observation will always be prioritized.
             threeobs_weight=np.min(\
-                [2.,1.+((timeof-target['last_obs'][-1][0]).total_seconds()-\
-                            -self.sep_limit)/self.sep_limit])
+                [2.,1.+((timeof-target['last_obs'][-1][0]).total_seconds()\
+                            -obs_sep_limit)/obs_sep_limit])
+
+
 
         #S weight for the third observation of a three obs run, but note that
         #S there is no cap on this one.
         elif target['observed']%3 == 2:
             threeobs_weight=2.+\
-                ((timeof-target['last_obs'][-1][0]).total_seconds()-\
-                     self.sep_limit)/self.sep_limit
+                ((timeof-target['last_obs'][-1][0]).total_seconds()\
+                     -obs_sep_limit)/obs_sep_limit
 
         return threeobs_weight+cad_weight
             
@@ -273,10 +287,12 @@ class scheduler:
                 target['neverup']=True
             else:
                 target['neverup']=False
+                """
                 try:
                     target['last_obs']=self.get_obs_history(target,prev_obs=1)
                 except:
                     target['last_obs']=[]
+                """
             if init_run == True:
                 try:
                     target['last_obs']=self.get_obs_history(target,prev_obs=1)

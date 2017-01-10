@@ -115,8 +115,14 @@ def plot_target(simpath,target):
 
 
     figt = plt.figure()#figsize=(11,6))
+    mpl.rcParams.update({'font.size': 18})
     ax2 = figt.add_subplot(2,1,2)
-    freqs = np.linspace(0,365,100000)
+    ax2.yaxis.grid(True)
+    ax2.set_title('Window Function')
+    ax2.set_xlabel('Period [days]')
+    ax2.set_ylabel('Amplitude')
+    ax2.axis([-.05*len(sr_days),len(sr_days)+.05*len(sr_days),0,1])
+    freqs = np.linspace(0.001,365*3,100000)
     win_func = window_function(freqs,dec_times)
     plt.plot(freqs,np.absolute(win_func))
     ax1 = figt.add_subplot(2,1,1)
@@ -164,12 +170,12 @@ def plot_target(simpath,target):
         print('No rise/set data for target?')
     # save plotting the obs for last for cleanliness in legend
     ax1.plot(days,times,'.',label='obs')
-    ax1.axis([-.1*len(sr_days),len(sr_days)+.1*len(sr_days),\
+    ax1.axis([-.05*len(sr_days),len(sr_days)+.25*len(sr_days),\
                     np.min(ss_times)-.2*np.min(ss_times),\
                     np.max(sr_times)+.2*np.max(sr_times)])
 
     box = ax.get_position()
-    ax1.set_position([box.x0, box.y0, box.width * 1.2, box.height])
+#    ax1.set_position([box.x0, box.y0, box.width * 1.2, box.height])
     
     # Put a legend to the right of the current axis
     ax1.legend()#loc='center left', bbox_to_anchor=(1, 0.5),borderaxespad=0.)
@@ -243,6 +249,7 @@ if __name__ == '__main__':
     fig = plt.figure()
     ax = fig.add_subplot(111)#,projection='mollweide')
     bline, = ax.plot(all_ras,all_decs,'.',zorder=1,picker=5)
+
     for target in target_list:
 
         # subtract 180 to center
@@ -251,19 +258,26 @@ if __name__ == '__main__':
         # for mollweide
 #        ra = math.radians(target['ra']-180.)
 #        dec = math.radians(target['dec'])
+#        ax.scatter(ra,dec,color='green')
+
         if target['num_obs'] == 0:
-            ax.scatter(ra,dec,color='grey',s=20,zorder=2)
-            ax.text(ra,dec,target['name'],size=7)
+            ax.scatter(ra,dec,color='grey',s=30,zorder=2)
+            ax.text(ra,dec,target['name'],size=10)
         else:
-            ax.scatter(ra,dec,c=target['num_obs'],s=20,zorder=2,
-                         vmin=min_num_obs,vmax=max_num_obs,cmap=plt.cm.copper)
-            ax.text(ra,dec,target['name'],size=7)
+            ax.scatter(ra,dec,c=target['num_obs'],s=30,zorder=2,
+                         vmin=min_num_obs,vmax=max_num_obs,cmap=plt.cm.autumn)
+            ax.text(ra,dec,target['name'],size=10)
+
     ax.grid()
     ax.axis([-.5,24.9,-40,95])
-    ax.set_title('Eta Earth list '+simnumber)
-    ax.set_xlabel('Right Ascension [hours]')
-    ax.set_ylabel('Declination [$^\circ$]')
-#    ax.set_xticklabels(['2h','4h','6h','8h','10h','12h','14h','16h','18h','20h','22h','24h'])
+#    mpl.rcParams.update({'font.size': 18})
+    ax.set_title('Eta Earth list '+simnumber,fontsize=16)
+    ax.set_xlabel('Right Ascension [hours]',fontsize=16)
+    ax.set_ylabel('Declination [$^\circ$]',fontsize=16)
+    sm = plt.cm.ScalarMappable(cmap=plt.cm.autumn, norm=plt.Normalize(vmin=min_num_obs, vmax=max_num_obs))
+    sm._A = []
+
+
     fig.canvas.mpl_connect('pick_event',lambda event: onpick(event,simpath,target_list))
     plt.show()
     
