@@ -277,7 +277,7 @@ if __name__ == '__main__':
                     break
 #                if sim.scheduler.is_observable(target):
                 total_exp += sim.calc_exptime(target)
-                if target['observed']>3:
+                if target['observed']>2:
                     ipdb.set_trace()
                 target['observed']+=1
 #                target['last_obs']=sim.time

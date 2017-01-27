@@ -148,7 +148,7 @@ class scheduler:
         #S going to use simple HA weighting for now.
         for target in self.target_list:
             if self.is_observable(target):
-                target['weight'] = self.calc_weight(target)#,timeof=self.time)
+                target['weight'] = self.calc_weight1(target,timeof=self.time)
             else:
                 target['weight'] = -999
         self.target_list = sorted(self.target_list, key=lambda x:-x['weight'])
@@ -188,13 +188,14 @@ class scheduler:
         if timeof == None:
             timeof = datetime.datetime.utcnow()
 
-        if target['observed']>3:
+        if target['observed']>2:
             return -1.
         
 
         # check to see if the target has an separation limit in it's list of 
         # dictionary keys, and if it does, set the observation separation
         # limit to that. needs to be in seconds
+
         if 'sep_limit' in target.keys():
             obs_sep_limit = target['sep_limit']
         else:
@@ -205,14 +206,10 @@ class scheduler:
         #S between observations, then we give it an 'unobservable' weight.
         # just comment out if you want a random start time
 #        self.start_ha = -self.sep_limit/3600.
-        try:
-            if (timeof-target['last_obs'][-1][0]).total_seconds()<\
-                    obs_sep_limit:
-                return -1.
-        except:
-            ipdb.set_trace()
-                
 
+        if (timeof-target['last_obs'][-1][0]).total_seconds()\
+                <obs_sep_limit:
+            return -1.
 
         cad_weight = 0.
         try:
